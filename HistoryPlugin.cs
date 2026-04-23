@@ -176,9 +176,11 @@ namespace MusicBeePlugin
 
         private void InitDatabase()
         {
-            conn =new SQLiteConnection("Data Source=MusicBeeHistory.db");
+            string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
+            string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
 
-                conn.Open();
+            conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;");
+            conn.Open();
                 SQLiteCommand command = conn.CreateCommand();
                 command.CommandText = @"PRAGMA foreign_keys = ON;";
                 command.ExecuteNonQuery();
