@@ -7,8 +7,9 @@ namespace MusicBeePlugin
     public partial class Plugin
     {
         private SQLiteConnection conn;
-        public void ReceiveNotification(NotificationType type)
+        public void ReceiveNotification(string sourceFileUrl, NotificationType type)
         {
+            {
             if (new NotificationType[]{ NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging}.Contains(type))
             {
                 PlayState state = mbApiInterface.Player_GetPlayState();
