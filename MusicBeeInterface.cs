@@ -702,7 +702,7 @@ namespace MusicBeePlugin
             MainPanel = 5
         }
 
-        
+
         public enum ReplayGainMode
         {
             Off = 0,
@@ -710,7 +710,7 @@ namespace MusicBeePlugin
             Album = 2,
             Smart = 3
         }
-        
+
         public enum PlayStatisticType
         {
             NoChange = 0,
@@ -722,7 +722,7 @@ namespace MusicBeePlugin
         {
             NavigateTo = 1
         }
-        
+
         public enum DownloadTarget
         {
             Inbox = 0,
