@@ -1,15 +1,12 @@
-﻿using Microsoft.Data.Sqlite;
-using System;
-using System.Drawing;
+﻿using System;
+using System.Data.SQLite;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Windows.Forms;
 
 namespace MusicBeePlugin
 {
     public partial class Plugin
     {
-        private SqliteConnection conn;
+        private SQLiteConnection conn;
         public void ReceiveNotification(NotificationType type)
         {
             if (new NotificationType[]{ NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging}.Contains(type))
@@ -29,7 +26,7 @@ namespace MusicBeePlugin
                     int? gid = GetOrCreateGenreId(conn, genre);
                     CreateStateIfNotExists(conn, state);
                     CreateTypeIfNotExists(conn, type);
-                    using (SqliteCommand cmd = conn.CreateCommand())
+                    using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = @"INSERT INTO History (Artist, Album, Title, Genre, Action, Played) VALUES (@artist, @album, @title, @genre, @action, @played);";
                         cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
@@ -45,12 +42,12 @@ namespace MusicBeePlugin
                 }
             }
         }
-        int? GetOrCreateArtistId(SqliteConnection conn, string name)
+        int? GetOrCreateArtistId(SQLiteConnection conn, string name)
         {
             if (!string.IsNullOrEmpty(name))
             {
                 // Najdi existujícího interpreta
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT Id FROM Artists WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -59,7 +56,7 @@ namespace MusicBeePlugin
                         return Convert.ToInt32(result);
                 }
                 // Pokud neexistuje, vlož nového
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO Artists (Value) VALUES (@name); SELECT last_insert_rowid();";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -67,12 +64,12 @@ namespace MusicBeePlugin
                 }
             } else return null;
         }
-        int? GetOrCreateGenreId(SqliteConnection conn, string name)
+        int? GetOrCreateGenreId(SQLiteConnection conn, string name)
         {
             if (!string.IsNullOrEmpty(name))
             {
                 // Najdi existující žánr
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT Id FROM Genres WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -81,7 +78,7 @@ namespace MusicBeePlugin
                         return Convert.ToInt32(result);
                 }
                 // Pokud neexistuje, vlož nový žánr
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO Genres (Value) VALUES (@name); SELECT last_insert_rowid();";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -90,12 +87,12 @@ namespace MusicBeePlugin
             }
             else return null;
         }
-        int? GetOrCreateAlbumId(SqliteConnection conn, string name)
+        int? GetOrCreateAlbumId(SQLiteConnection conn, string name)
         {
             if (!string.IsNullOrEmpty(name))
             {
                 // Najdi existující album
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT Id FROM Albums WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -104,7 +101,7 @@ namespace MusicBeePlugin
                         return Convert.ToInt32(result);
                 }
                 // Pokud neexistuje, vlož nové album
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO Albums (Value) VALUES (@name); SELECT last_insert_rowid();";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -112,12 +109,12 @@ namespace MusicBeePlugin
                 }
             } else return null;
         }
-        int? GetOrCreateTitleId(SqliteConnection conn, string name)
+        int? GetOrCreateTitleId(SQLiteConnection conn, string name)
         {
             if (!string.IsNullOrEmpty(name))
             {
                 // Najdi existující album
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT Id FROM Titles WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -126,7 +123,7 @@ namespace MusicBeePlugin
                         return Convert.ToInt32(result);
                 }
                 // Pokud neexistuje, vlož nové album
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO Titles (Value) VALUES (@name); SELECT last_insert_rowid();";
                     cmd.Parameters.AddWithValue("@name", name);
@@ -134,10 +131,10 @@ namespace MusicBeePlugin
                 }
             } else return null;
         }
-        void CreateStateIfNotExists(SqliteConnection conn, PlayState state)
+        void CreateStateIfNotExists(SQLiteConnection conn, PlayState state)
         {
 
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT Id FROM Actions WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", state.ToString());
@@ -146,7 +143,7 @@ namespace MusicBeePlugin
                         return;
                 }
                 // Pokud neexistuje, vlož novou akci
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO Actions (Id,Value) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
@@ -155,10 +152,10 @@ namespace MusicBeePlugin
                 }
 
         }
-        void CreateTypeIfNotExists(SqliteConnection conn, NotificationType state)
+        void CreateTypeIfNotExists(SQLiteConnection conn, NotificationType state)
         {
 
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT Id FROM Types WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", state.ToString());
@@ -167,7 +164,7 @@ namespace MusicBeePlugin
                         return;
                 }
                 // Pokud neexistuje, vlož novou akci
-                using (SqliteCommand cmd = conn.CreateCommand())
+                using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO Types (Id,Value) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
@@ -179,10 +176,10 @@ namespace MusicBeePlugin
 
         private void InitDatabase()
         {
-            conn =new SqliteConnection("Data Source=MusicBeeHistory.db");
+            conn =new SQLiteConnection("Data Source=MusicBeeHistory.db");
 
                 conn.Open();
-                SqliteCommand command = conn.CreateCommand();
+                SQLiteCommand command = conn.CreateCommand();
                 command.CommandText = @"PRAGMA foreign_keys = ON;";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS History (

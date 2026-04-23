@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
 
+
 namespace MusicBeePlugin
 {
     public partial class Plugin
@@ -13,23 +14,32 @@ namespace MusicBeePlugin
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
         {
-            mbApiInterface = new MusicBeeApiInterface();
-            mbApiInterface.Initialise(apiInterfacePtr);
-            about.PluginInfoVersion = PluginInfoVersion;
-            about.Name = "Plugin Name";
-            about.Description = "A brief description of what this plugin does";
-            about.Author = "Author";
-            about.TargetApplication = "";   //  the name of a Plugin Storage device or panel header for a dockable panel
-            about.Type = PluginType.General;
-            about.VersionMajor = 1;  // your plugin version
-            about.VersionMinor = 0;
-            about.Revision = 1;
-            about.MinInterfaceVersion = MinInterfaceVersion;
-            about.MinApiRevision = MinApiRevision;
-            about.ReceiveNotifications = (ReceiveNotificationFlags.PlayerEvents);
-            about.ConfigurationPanelHeight = 0;   // height in pixels that musicbee should reserve in a panel for config settings. When set, a handle to an empty panel will be passed to the Configure function
-            InitDatabase();
-            return about;
+            try
+            {
+                mbApiInterface = new MusicBeeApiInterface();
+                mbApiInterface.Initialise(apiInterfacePtr);
+                about.PluginInfoVersion = PluginInfoVersion;
+                about.Name = "Plugin Name";
+                about.Description = "A brief description of what this plugin does";
+                about.Author = "Author";
+                about.TargetApplication = "";   //  the name of a Plugin Storage device or panel header for a dockable panel
+                about.Type = PluginType.General;
+                about.VersionMajor = 1;  // your plugin version
+                about.VersionMinor = 0;
+                about.Revision = 1;
+                about.MinInterfaceVersion = MinInterfaceVersion;
+                about.MinApiRevision = MinApiRevision;
+                about.ReceiveNotifications = (ReceiveNotificationFlags.PlayerEvents);
+                about.ConfigurationPanelHeight = 0;   // height in pixels that musicbee should reserve in a panel for config settings. When set, a handle to an empty panel will be passed to the Configure function
+                InitDatabase();
+                return about;
+            }
+            catch (Exception ex)
+            {
+                // Tohle vám řekne přesně, co chybí
+                System.Windows.Forms.MessageBox.Show(ex.Message + "\n\n" + ex.StackTrace);
+                return null;
+            }
         }
 
         public bool Configure(IntPtr panelHandle)
@@ -52,7 +62,7 @@ namespace MusicBeePlugin
             }
             return false;
         }
-       
+
         // called by MusicBee when the user clicks Apply or Save in the MusicBee Preferences screen.
         // its up to you to figure out whether anything has changed and needs updating
         public void SaveSettings()
@@ -64,6 +74,7 @@ namespace MusicBeePlugin
         // MusicBee is closing the plugin (plugin is being disabled by user or MusicBee is shutting down)
         public void Close(PluginCloseReason reason)
         {
+            conn.Close();
         }
 
         // uninstall this plugin - clean up any persisted files
