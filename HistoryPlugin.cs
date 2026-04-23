@@ -191,7 +191,7 @@ namespace MusicBeePlugin
                     State integer,
                     Type integer,
                     Played float,
-                    Time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    Time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     foreign key(Artist) references Artists(Id),
                     foreign key(Album) references Albums(Id),
                     foreign key(Title) references Titles(Id),
