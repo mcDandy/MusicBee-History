@@ -201,6 +201,7 @@ namespace MusicBeePlugin
                 }
                 else return -1;
             }
+        }
 
         private void InitDatabase()
         {
