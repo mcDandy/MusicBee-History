@@ -9,7 +9,7 @@ namespace MusicBeePlugin
     {
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging }.Contains(event_type))
+                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.VolumeLevelChanged,NotificationType.PluginStartup,NotificationType.ShutdownStarted }.Contains(event_type))
                 {
                     PlayState state = mbApiInterface.Player_GetPlayState();
                     int played = mbApiInterface.Player_GetPosition();
@@ -31,7 +31,7 @@ namespace MusicBeePlugin
                             int? alid = GetOrCreateAlbumId(conn, album);
                             int? tid = GetOrCreateTitleId(conn, title);
                             int? gid = GetOrCreateGenreId(conn, genre);
-                            int urli = GetOrCreateUrlId(conn, sourceFileUrl);
+                            int? urli = GetOrCreateUrlId(conn, sourceFileUrl);
                             CreateStateIfNotExists(conn, state);
                             Createevent_typeIfNotExists(conn, event_type);
 
@@ -51,7 +51,7 @@ namespace MusicBeePlugin
                                 cmd.Parameters.AddWithValue("@played", played);
                                 cmd.Parameters.AddWithValue("@Length", length);
                                 cmd.Parameters.AddWithValue("@Time", DateTime.UtcNow.Ticks/10_000_000d);
-                                cmd.Parameters.AddWithValue("@Url", urli);
+                                cmd.Parameters.AddWithValue("@Url", (object)urli ?? DBNull.Value);
 
                             try
 {
@@ -208,7 +208,7 @@ catch (Exception ex)
                 }
 
             }
-            int GetOrCreateUrlId(SQLiteConnection conn, string url)
+            int? GetOrCreateUrlId(SQLiteConnection conn, string url)
             {
                 if (!string.IsNullOrEmpty(url))
                 {
@@ -229,7 +229,7 @@ catch (Exception ex)
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
                 }
-                else return -1;
+                else return null;
             }
         }
 
