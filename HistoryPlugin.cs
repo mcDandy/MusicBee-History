@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data.SQLite;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace MusicBeePlugin
 {
@@ -11,8 +12,8 @@ namespace MusicBeePlugin
                 if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging }.Contains(event_type))
                 {
                     PlayState state = mbApiInterface.Player_GetPlayState();
-                    float played = mbApiInterface.Player_GetPosition();
-                    float length = mbApiInterface.NowPlaying_GetDuration();
+                    int played = mbApiInterface.Player_GetPosition();
+                    int length = mbApiInterface.NowPlaying_GetDuration();
                     string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
                     string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
                     string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
@@ -49,9 +50,17 @@ namespace MusicBeePlugin
                                 cmd.Parameters.AddWithValue("@event_type", (int)event_type);
                                 cmd.Parameters.AddWithValue("@played", played);
                                 cmd.Parameters.AddWithValue("@Length", length);
+                                cmd.Parameters.AddWithValue("@Time", DateTime.UtcNow.Ticks/10_000_000d);
                                 cmd.Parameters.AddWithValue("@Url", urli);
-                                cmd.ExecuteNonQuery();
-                            }
+
+                            try
+{
+    cmd.ExecuteNonQuery();
+}
+catch (Exception ex)
+{
+    MessageBox.Show(ex.ToString());
+}                            }
                         }
                     }
                 }
@@ -165,7 +174,9 @@ namespace MusicBeePlugin
                     cmd.CommandText = "INSERT INTO player_states (Id,Value) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
-                    cmd.ExecuteNonQuery();
+
+                     cmd.ExecuteNonQuery();
+
                 }
 
             }
@@ -186,7 +197,14 @@ namespace MusicBeePlugin
                     cmd.CommandText = "INSERT INTO event_types (Id,Value) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
-                    cmd.ExecuteNonQuery();
+                    try
+{
+    cmd.ExecuteNonQuery();
+}
+catch (Exception ex)
+{
+    MessageBox.Show(ex.ToString());
+}
                 }
 
             }
@@ -234,9 +252,9 @@ namespace MusicBeePlugin
                     player_state integer,
                     event_type integer,
                     Url integer,
-                    Played float,
-                    Lenght float,
-                    Time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    Played integer,
+                    Length integer,
+                    Time TIMESTAMP DEFAULT(unixepoch('subsec')),
                     foreign key(Artist) references Artists(Id),
                     foreign key(Album) references Albums(Id),
                     foreign key(Title) references Titles(Id),
