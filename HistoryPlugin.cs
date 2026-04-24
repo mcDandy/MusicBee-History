@@ -9,7 +9,7 @@ namespace MusicBeePlugin
     {
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.VolumeLevelChanged,NotificationType.PluginStartup,NotificationType.ShutdownStarted }.Contains(event_type))
+                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup,NotificationType.ShutdownStarted }.Contains(event_type))
                 {
                     PlayState state = mbApiInterface.Player_GetPlayState();
                     int played = mbApiInterface.Player_GetPosition();
@@ -39,9 +39,9 @@ namespace MusicBeePlugin
                         using (SQLiteCommand cmd = conn.CreateCommand())
                             {
                             cmd.CommandText = @"INSERT INTO History 
-                                                (Artist, Album, Title, Genre, player_state, event_type, Played,Length, Url) 
+                                                (Artist, Album, Title, Genre, player_state, event_type, Played,Length,Time, Url) 
                                                 VALUES 
-                                                (@artist, @album, @title, @genre, @player_state, @event_type, @played, @Length, @Url);";
+                                                (@artist, @album, @title, @genre, @player_state, @event_type, @played, @Length, @Time, @Url);";
                             cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
