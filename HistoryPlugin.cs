@@ -11,7 +11,8 @@ namespace MusicBeePlugin
                 if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging }.Contains(event_type))
                 {
                     PlayState state = mbApiInterface.Player_GetPlayState();
-                    int played = mbApiInterface.Player_GetPosition();
+                    float played = mbApiInterface.Player_GetPosition();
+                    float length = mbApiInterface.NowPlaying_GetDuration();
                     string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
                     string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
                     string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
@@ -32,12 +33,14 @@ namespace MusicBeePlugin
                             int urli = GetOrCreateUrlId(conn, sourceFileUrl);
                             CreateStateIfNotExists(conn, state);
                             Createevent_typeIfNotExists(conn, event_type);
-                            using (SQLiteCommand cmd = conn.CreateCommand())
+
+
+                        using (SQLiteCommand cmd = conn.CreateCommand())
                             {
                             cmd.CommandText = @"INSERT INTO History 
-                                                (Artist, Album, Title, Genre, player_state, event_type, Played, Url) 
+                                                (Artist, Album, Title, Genre, player_state, event_type, Played,Length, Url) 
                                                 VALUES 
-                                                (@artist, @album, @title, @genre, @player_state, @event_type, @played, @Url);";
+                                                (@artist, @album, @title, @genre, @player_state, @event_type, @played, @Length, @Url);";
                             cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
@@ -45,6 +48,7 @@ namespace MusicBeePlugin
                                 cmd.Parameters.AddWithValue("@player_state", (int)state);
                                 cmd.Parameters.AddWithValue("@event_type", (int)event_type);
                                 cmd.Parameters.AddWithValue("@played", played);
+                                cmd.Parameters.AddWithValue("@Length", length);
                                 cmd.Parameters.AddWithValue("@Url", urli);
                                 cmd.ExecuteNonQuery();
                             }
@@ -231,6 +235,7 @@ namespace MusicBeePlugin
                     event_type integer,
                     Url integer,
                     Played float,
+                    Lenght float,
                     Time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     foreign key(Artist) references Artists(Id),
                     foreign key(Album) references Albums(Id),
