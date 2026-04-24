@@ -6,9 +6,9 @@ namespace MusicBeePlugin
 {
     public partial class Plugin
     {
-        public void ReceiveNotification(string sourceFileUrl, NotificationType type)
+        public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging }.Contains(type))
+                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging }.Contains(event_type))
                 {
                     PlayState state = mbApiInterface.Player_GetPlayState();
                     int played = mbApiInterface.Player_GetPosition();
@@ -31,16 +31,16 @@ namespace MusicBeePlugin
                             int? gid = GetOrCreateGenreId(conn, genre);
                             int urli = GetOrCreateUrlId(conn, sourceFileUrl);
                             CreateStateIfNotExists(conn, state);
-                            CreateTypeIfNotExists(conn, type);
+                            Createevent_typeIfNotExists(conn, event_type);
                             using (SQLiteCommand cmd = conn.CreateCommand())
                             {
-                                cmd.CommandText = @"INSERT INTO History (Artist, Album, Title, Genre, Action, Played, Url) VALUES (@artist, @album, @title, @genre, @action, @played, @Url);";
+                                cmd.CommandText = @"INSERT INTO History (Artist, Album, Title, Genre, player_state, Played, Url) VALUES (@artist, @album, @title, @genre, @player_state, @played, @Url);";
                                 cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@genre", (object)gid ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@action", (int)state);
-                                cmd.Parameters.AddWithValue("@type", (int)type);
+                                cmd.Parameters.AddWithValue("@player_state", (int)state);
+                                cmd.Parameters.AddWithValue("@event_type", (int)event_type);
                                 cmd.Parameters.AddWithValue("@played", played);
                                 cmd.Parameters.AddWithValue("@Url", urli);
                                 cmd.ExecuteNonQuery();
@@ -146,7 +146,7 @@ namespace MusicBeePlugin
 
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT Id FROM Actions WHERE Value = @name";
+                    cmd.CommandText = "SELECT Id FROM player_states WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     object result = cmd.ExecuteScalar();
                     if (result != null)
@@ -155,19 +155,19 @@ namespace MusicBeePlugin
                 // Pokud neexistuje, vlož novou akci
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO Actions (Id,Value) VALUES (@id,@name);";
+                    cmd.CommandText = "INSERT INTO player_states (Id,Value) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     cmd.ExecuteNonQuery();
                 }
 
             }
-            void CreateTypeIfNotExists(SQLiteConnection conn, NotificationType state)
+            void Createevent_typeIfNotExists(SQLiteConnection conn, NotificationType state)
             {
 
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT Id FROM Types WHERE Value = @name";
+                    cmd.CommandText = "SELECT Id FROM event_types WHERE Value = @name";
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     object result = cmd.ExecuteScalar();
                     if (result != null)
@@ -176,7 +176,7 @@ namespace MusicBeePlugin
                 // Pokud neexistuje, vlož novou akci
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO Types (Id,Value) VALUES (@id,@name);";
+                    cmd.CommandText = "INSERT INTO event_types (Id,Value) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     cmd.ExecuteNonQuery();
@@ -224,8 +224,8 @@ namespace MusicBeePlugin
                     Album integer,
                     Title integer,
                     Genre integer,
-                    State integer,
-                    Type integer,
+                    player_state integer,
+                    event_type integer,
                     Url integer,
                     Played float,
                     Time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -233,8 +233,8 @@ namespace MusicBeePlugin
                     foreign key(Album) references Albums(Id),
                     foreign key(Title) references Titles(Id),
                     foreign key(Genre) references Genres(Id),
-                    foreign key(State) references States(Id),
-                    foreign key(Type) references Types(Id),
+                    foreign key(player_state) references player_states(Id),
+                    foreign key(event_type) references event_types(Id),
                     foreign key(Url) references Urls(Id)
                 )";
             command.ExecuteNonQuery();
@@ -258,12 +258,12 @@ namespace MusicBeePlugin
                     Value TEXT UNIQUE
                 )";
             command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS States (
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS player_states (
                     Id INTEGER PRIMARY KEY,
                     Value TEXT UNIQUE
                 )";
             command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS Types (
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS event_types (
                     Id INTEGER PRIMARY KEY,
                     Value TEXT UNIQUE
                 )";
