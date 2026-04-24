@@ -6,10 +6,8 @@ namespace MusicBeePlugin
 {
     public partial class Plugin
     {
-        private SQLiteConnection conn;
         public void ReceiveNotification(string sourceFileUrl, NotificationType type)
         {
-            {
                 if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging }.Contains(type))
                 {
                     PlayState state = mbApiInterface.Player_GetPlayState();
@@ -21,29 +19,36 @@ namespace MusicBeePlugin
 
                     if (new PlayState[] { PlayState.Stopped, PlayState.Paused, PlayState.Playing }.Contains(state))
                     {
-                        int? aid = GetOrCreateArtistId(conn, artist);
-                        int? alid = GetOrCreateAlbumId(conn, album);
-                        int? tid = GetOrCreateTitleId(conn, title);
-                        int? gid = GetOrCreateGenreId(conn, genre);
-                        int urli = GetOrCreateUrlId(conn, sourceFileUrl);
-                        CreateStateIfNotExists(conn, state);
-                        CreateTypeIfNotExists(conn, type);
-                        using (SQLiteCommand cmd = conn.CreateCommand())
+                        string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
+                        string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
+
+                        using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
                         {
-                            cmd.CommandText = @"INSERT INTO History (Artist, Album, Title, Genre, Action, Played, Url) VALUES (@artist, @album, @title, @genre, @action, @played, @Url);";
-                            cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@genre", (object)gid ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@action", (int)state);
-                            cmd.Parameters.AddWithValue("@type", (int)type);
-                            cmd.Parameters.AddWithValue("@played", played);
-                            cmd.Parameters.AddWithValue("@Url", urli);
-                            cmd.ExecuteNonQuery();
+                            conn.Open();
+                            int? aid = GetOrCreateArtistId(conn, artist);
+                            int? alid = GetOrCreateAlbumId(conn, album);
+                            int? tid = GetOrCreateTitleId(conn, title);
+                            int? gid = GetOrCreateGenreId(conn, genre);
+                            int urli = GetOrCreateUrlId(conn, sourceFileUrl);
+                            CreateStateIfNotExists(conn, state);
+                            CreateTypeIfNotExists(conn, type);
+                            using (SQLiteCommand cmd = conn.CreateCommand())
+                            {
+                                cmd.CommandText = @"INSERT INTO History (Artist, Album, Title, Genre, Action, Played, Url) VALUES (@artist, @album, @title, @genre, @action, @played, @Url);";
+                                cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@genre", (object)gid ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@action", (int)state);
+                                cmd.Parameters.AddWithValue("@type", (int)type);
+                                cmd.Parameters.AddWithValue("@played", played);
+                                cmd.Parameters.AddWithValue("@Url", urli);
+                                cmd.ExecuteNonQuery();
+                            }
                         }
                     }
                 }
-            }
+
             int? GetOrCreateArtistId(SQLiteConnection conn, string name)
             {
                 if (!string.IsNullOrEmpty(name))
@@ -208,12 +213,12 @@ namespace MusicBeePlugin
             string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
             string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
 
-            conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;");
+            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;")) {
             conn.Open();
-                SQLiteCommand command = conn.CreateCommand();
-                command.CommandText = @"PRAGMA foreign_keys = ON;";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS History (
+            SQLiteCommand command = conn.CreateCommand();
+            command.CommandText = @"PRAGMA foreign_keys = ON;";
+            command.ExecuteNonQuery();
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS History (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Artist integer,
                     Album integer,
@@ -232,23 +237,23 @@ namespace MusicBeePlugin
                     foreign key(Type) references Types(Id),
                     foreign key(Url) references Urls(Id)
                 )";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Artists (
+            command.ExecuteNonQuery();
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS Artists (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Albums (
+            command.ExecuteNonQuery();
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS Albums (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Titles (
+            command.ExecuteNonQuery();
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS Titles (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Genres (
+            command.ExecuteNonQuery();
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS Genres (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
@@ -268,5 +273,5 @@ namespace MusicBeePlugin
                 )";
             command.ExecuteNonQuery();
         }
-    }
+    } }
 }
