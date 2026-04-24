@@ -34,8 +34,11 @@ namespace MusicBeePlugin
                             Createevent_typeIfNotExists(conn, event_type);
                             using (SQLiteCommand cmd = conn.CreateCommand())
                             {
-                                cmd.CommandText = @"INSERT INTO History (Artist, Album, Title, Genre, player_state, Played, Url) VALUES (@artist, @album, @title, @genre, @player_state, @played, @Url);";
-                                cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
+                            cmd.CommandText = @"INSERT INTO History 
+                                                (Artist, Album, Title, Genre, player_state, event_type, Played, Url) 
+                                                VALUES 
+                                                (@artist, @album, @title, @genre, @player_state, @event_type, @played, @Url);";
+                            cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@genre", (object)gid ?? DBNull.Value);
@@ -267,6 +270,7 @@ namespace MusicBeePlugin
                     Id INTEGER PRIMARY KEY,
                     Value TEXT UNIQUE
                 )";
+                command.ExecuteNonQuery();
             command.CommandText = @"CREATE TABLE IF NOT EXISTS Urls (
                     Id INTEGER PRIMARY KEY,
                     Value TEXT UNIQUE
