@@ -9,61 +9,62 @@ namespace MusicBeePlugin
     {
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-                if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup,NotificationType.ShutdownStarted }.Contains(event_type))
+            if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted }.Contains(event_type))
+            {
+                PlayState state = mbApiInterface.Player_GetPlayState();
+                int played = mbApiInterface.Player_GetPosition();
+                int length = mbApiInterface.NowPlaying_GetDuration();
+                string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
+                string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
+                string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
+                string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
+
+                if (new PlayState[] { PlayState.Stopped, PlayState.Paused, PlayState.Playing }.Contains(state))
                 {
-                    PlayState state = mbApiInterface.Player_GetPlayState();
-                    int played = mbApiInterface.Player_GetPosition();
-                    int length = mbApiInterface.NowPlaying_GetDuration();
-                    string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
-                    string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
-                    string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
-                    string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
+                    string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
+                    string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
 
-                    if (new PlayState[] { PlayState.Stopped, PlayState.Paused, PlayState.Playing }.Contains(state))
+                    using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
                     {
-                        string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-                        string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
-
-                        using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
-                        {
-                            conn.Open();
-                            int? aid = GetOrCreateArtistId(conn, artist);
-                            int? alid = GetOrCreateAlbumId(conn, album);
-                            int? tid = GetOrCreateTitleId(conn, title);
-                            int? gid = GetOrCreateGenreId(conn, genre);
-                            int? urli = GetOrCreateUrlId(conn, sourceFileUrl);
-                            CreateStateIfNotExists(conn, state);
-                            Createevent_typeIfNotExists(conn, event_type);
+                        conn.Open();
+                        int? aid = GetOrCreateArtistId(conn, artist);
+                        int? alid = GetOrCreateAlbumId(conn, album);
+                        int? tid = GetOrCreateTitleId(conn, title);
+                        int? gid = GetOrCreateGenreId(conn, genre);
+                        int? urli = GetOrCreateUrlId(conn, sourceFileUrl);
+                        CreateStateIfNotExists(conn, state);
+                        Createevent_typeIfNotExists(conn, event_type);
 
 
                         using (SQLiteCommand cmd = conn.CreateCommand())
-                            {
+                        {
                             cmd.CommandText = @"INSERT INTO History 
                                                 (Artist, Album, Title, Genre, player_state, event_type, Played,Length,Time, Url) 
                                                 VALUES 
                                                 (@artist, @album, @title, @genre, @player_state, @event_type, @played, @Length, @Time, @Url);";
                             cmd.Parameters.AddWithValue("@artist", (object)aid ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@genre", (object)gid ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@player_state", (int)state);
-                                cmd.Parameters.AddWithValue("@event_type", (int)event_type);
-                                cmd.Parameters.AddWithValue("@played", played);
-                                cmd.Parameters.AddWithValue("@Length", length);
-                                cmd.Parameters.AddWithValue("@Time", DateTime.UtcNow.Ticks/10_000_000d);
-                                cmd.Parameters.AddWithValue("@Url", (object)urli ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@album", (object)alid ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@title", (object)tid ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@genre", (object)gid ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@player_state", (int)state);
+                            cmd.Parameters.AddWithValue("@event_type", (int)event_type);
+                            cmd.Parameters.AddWithValue("@played", played);
+                            cmd.Parameters.AddWithValue("@Length", length);
+                            cmd.Parameters.AddWithValue("@Time", DateTime.UtcNow.Ticks / 10_000_000d);
+                            cmd.Parameters.AddWithValue("@Url", (object)urli ?? DBNull.Value);
 
                             try
-{
-    cmd.ExecuteNonQuery();
-}
-catch (Exception ex)
-{
-    MessageBox.Show(ex.ToString());
-}                            }
+                            {
+                                cmd.ExecuteNonQuery();
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show(ex.ToString());
+                            }
                         }
                     }
                 }
+            }
 
             int? GetOrCreateArtistId(SQLiteConnection conn, string name)
             {
@@ -175,7 +176,7 @@ catch (Exception ex)
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
 
-                     cmd.ExecuteNonQuery();
+                    cmd.ExecuteNonQuery();
 
                 }
 
@@ -198,13 +199,13 @@ catch (Exception ex)
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     try
-{
-    cmd.ExecuteNonQuery();
-}
-catch (Exception ex)
-{
-    MessageBox.Show(ex.ToString());
-}
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.ToString());
+                    }
                 }
 
             }
@@ -238,12 +239,13 @@ catch (Exception ex)
             string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
             string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
 
-            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;")) {
-            conn.Open();
-            SQLiteCommand command = conn.CreateCommand();
-            command.CommandText = @"PRAGMA foreign_keys = ON;";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS History (
+            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+            {
+                conn.Open();
+                SQLiteCommand command = conn.CreateCommand();
+                command.CommandText = @"PRAGMA foreign_keys = ON;";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS History (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Artist integer,
                     Album integer,
@@ -263,43 +265,43 @@ catch (Exception ex)
                     foreign key(event_type) references event_types(Id),
                     foreign key(Url) references Urls(Id)
                 )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS Artists (
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS Artists (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS Albums (
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS Albums (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS Titles (
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS Titles (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS Genres (
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS Genres (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Value TEXT UNIQUE
                 )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS player_states (
-                    Id INTEGER PRIMARY KEY,
-                    Value TEXT UNIQUE
-                )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS event_types (
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS player_states (
                     Id INTEGER PRIMARY KEY,
                     Value TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS Urls (
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS event_types (
                     Id INTEGER PRIMARY KEY,
                     Value TEXT UNIQUE
                 )";
-            command.ExecuteNonQuery();
-            command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS Urls (
+                    Id INTEGER PRIMARY KEY,
+                    Value TEXT UNIQUE
+                )";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
                 SELECT 
                     h.Id,
                     datetime(h.Time, 'unixepoch', 'localtime') AS Event_time,
@@ -322,5 +324,6 @@ catch (Exception ex)
                 ORDER BY h.Time DESC;";
                 command.ExecuteNonQuery();
             }
-    } }
+        }
+    }
 }
