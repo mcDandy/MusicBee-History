@@ -7,6 +7,7 @@ namespace MusicBeePlugin
 {
     public partial class Plugin
     {
+        const long unixTicks = 621355968000000000L;
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
             if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup }.Contains(event_type))
@@ -50,7 +51,7 @@ namespace MusicBeePlugin
                             cmd.Parameters.AddWithValue("@event_type", (int)event_type);
                             cmd.Parameters.AddWithValue("@played", played);
                             cmd.Parameters.AddWithValue("@Length", length);
-                            cmd.Parameters.AddWithValue("@Time", DateTime.UtcNow.Ticks / 10_000_000d);
+                            cmd.Parameters.AddWithValue("@Time", (DateTime.UtcNow.Ticks-unixTicks) / 10_000_000d);
                             cmd.Parameters.AddWithValue("@Url", (object)urli ?? DBNull.Value);
 
                             try
