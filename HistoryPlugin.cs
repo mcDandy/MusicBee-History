@@ -9,7 +9,7 @@ namespace MusicBeePlugin
     {
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-            if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted }.Contains(event_type))
+            if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup }.Contains(event_type))
             {
                 PlayState state = mbApiInterface.Player_GetPlayState();
                 int played = mbApiInterface.Player_GetPosition();
