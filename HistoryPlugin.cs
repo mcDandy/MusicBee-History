@@ -299,6 +299,28 @@ catch (Exception ex)
                     Value TEXT UNIQUE
                 )";
             command.ExecuteNonQuery();
-        }
+            command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
+                SELECT 
+                    h.Id,
+                    datetime(h.Time, 'unixepoch', 'localtime') AS Event_time,
+                    a.Value AS Artist,
+                    t.Value AS Title,
+                    al.Value AS Album,
+                    g.Value AS Genre,
+                    ps.Value AS Player_state,
+                    et.Value AS Event_type,
+                    ROUND(h.Played / 1000.0, 2) AS Seconds_played,
+                    ROUND(h.Length / 1000.0, 2) AS Lenght_of_media_s,
+                    ROUND((h.Played * 100.0) / h.Length, 1) AS percent_played
+                FROM History h
+                LEFT JOIN Artists a ON h.Artist = a.Id
+                LEFT JOIN Titles t ON h.Title = t.Id
+                LEFT JOIN Albums al ON h.Album = al.Id
+                LEFT JOIN Genres g ON h.Genre = g.Id
+                LEFT JOIN player_states ps ON h.player_state = ps.Id
+                LEFT JOIN event_types et ON h.event_type = et.Id
+                ORDER BY h.Time DESC;";
+                command.ExecuteNonQuery();
+            }
     } }
 }
