@@ -78,9 +78,10 @@ namespace MusicBeePlugin
                         }
                     }
                 }
-            lastEvent = event_type;
-            lastState = state;
-            lastEventTime = DateTime.UtcNow;
+                lastEvent = event_type;
+                lastState = state;
+                lastHeadPos = played;
+                lastEventTime = DateTime.UtcNow;
             }
 
 
