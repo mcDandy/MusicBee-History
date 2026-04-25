@@ -7,9 +7,9 @@ namespace MusicBeePlugin
 {
     public partial class Plugin
     {
-        static NotificationType lastEvent;
-        static PlayState lastState;
-        static DateTime lastEventTime;
+        static NotificationType lastEvent = NotificationType.PluginStartup;
+        static PlayState lastState = PlayState.Stopped;
+        static DateTime lastEventTime = DateTime.UtcNow;
         static int lastHeadPos = 0;
         const long unixTicks = 621355968000000000L;
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
@@ -24,11 +24,15 @@ namespace MusicBeePlugin
                 string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
                 string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
 
-                if (played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing)
+                if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
                 {
                     played = lastHeadPos + (int)(DateTime.UtcNow - lastEventTime).TotalMilliseconds;
                 }
-                else if (played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused)
+                else if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Paused))
+                {
+                    played = lastHeadPos;
+                }
+                else if (played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Stopped)
                 {
                     played = lastHeadPos;
                 }
