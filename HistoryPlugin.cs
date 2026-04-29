@@ -14,8 +14,12 @@ namespace MusicBeePlugin
         const long unixTicks = 621355968000000000L;
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-            if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted }.Contains(event_type))
+            if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged }.Contains(event_type))
             {
+                if(event_type == NotificationType.TempoSetOrChanged)
+                {
+                    MessageBox.Show(sourceFileUrl);
+                }
                 PlayState state = mbApiInterface.Player_GetPlayState();
                 int played = mbApiInterface.Player_GetPosition();
                 int length = mbApiInterface.NowPlaying_GetDuration();

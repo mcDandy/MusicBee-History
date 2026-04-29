@@ -360,7 +360,8 @@ namespace MusicBeePlugin
             PlayingTracksQueueChanged = 36,
 			PlaylistCreated = 37,
 			PlaylistUpdated = 38,
-			PlaylistDeleted = 39
+			PlaylistDeleted = 39,
+            TempoSetOrChanged = 48
         }
 
         public enum PluginCloseReason
