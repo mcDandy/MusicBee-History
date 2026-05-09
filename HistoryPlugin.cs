@@ -206,7 +206,7 @@ namespace MusicBeePlugin
                     // Najdi existující žánr
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT Id FROM Genres WHERE Value = @name";
+                        cmd.CommandText = "SELECT ID FROM GENRES WHERE VALUE = @name";
                         cmd.Parameters.AddWithValue("@name", name);
                         object result = cmd.ExecuteScalar();
                         if (result != null)
@@ -215,7 +215,7 @@ namespace MusicBeePlugin
                     // Pokud neexistuje, vlož nový žánr
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "INSERT INTO Genres (Value) VALUES (@name); SELECT last_insert_rowid();";
+                        cmd.CommandText = "INSERT INTO GENRES (VALUE) VALUES (@name); SELECT last_insert_rowid();";
                         cmd.Parameters.AddWithValue("@name", name);
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
@@ -229,7 +229,7 @@ namespace MusicBeePlugin
                     // Najdi existující album
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT Id FROM Albums WHERE Value = @name";
+                        cmd.CommandText = "SELECT ID FROM ALBUMS WHERE VALUE = @name";
                         cmd.Parameters.AddWithValue("@name", name);
                         object result = cmd.ExecuteScalar();
                         if (result != null)
@@ -238,7 +238,7 @@ namespace MusicBeePlugin
                     // Pokud neexistuje, vlož nové album
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "INSERT INTO Albums (Value) VALUES (@name); SELECT last_insert_rowid();";
+                        cmd.CommandText = "INSERT INTO ALBUMS (VALUE) VALUES (@name); SELECT last_insert_rowid();";
                         cmd.Parameters.AddWithValue("@name", name);
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
@@ -252,16 +252,16 @@ namespace MusicBeePlugin
                     // Najdi existující titul
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT Id FROM Titles WHERE Value = @name";
+                        cmd.CommandText = "SELECT ID FROM TITLES WHERE VALUE = @name";
                         cmd.Parameters.AddWithValue("@name", name);
                         object result = cmd.ExecuteScalar();
                         if (result != null)
                             return Convert.ToInt32(result);
                     }
-                    // Pokud neexistuje, vlož nové album
+                    // Pokud neexistuje, vlož nový titul
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "INSERT INTO Titles (Value) VALUES (@name); SELECT last_insert_rowid();";
+                        cmd.CommandText = "INSERT INTO TITLES (VALUE) VALUES (@name); SELECT last_insert_rowid();";
                         cmd.Parameters.AddWithValue("@name", name);
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
@@ -272,7 +272,7 @@ namespace MusicBeePlugin
             {
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT Id FROM Tracks WHERE artist_id = @aid AND album_id = @alid AND title_id = @tid AND genre_id = @gid AND url_id = @urli AND abs(length - @length) < 100";
+                    cmd.CommandText = "SELECT ID FROM TRACKS WHERE artist_id = @aid AND album_id = @alid AND title_id = @tid AND genre_id = @gid AND url_id = @urli AND abs(length - @length) < 100";
                     cmd.Parameters.AddWithValue("@aid", aid);
                     cmd.Parameters.AddWithValue("@alid", alid);
                     cmd.Parameters.AddWithValue("@tid", tid);
@@ -283,10 +283,10 @@ namespace MusicBeePlugin
                     if (result != null)
                         return Convert.ToInt32(result);
                 }
-                // Pokud neexistuje, vlož nové album
+                // Pokud neexistuje, vlož nový titul
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO Tracks (artist_id, album_id, title_id, genre_id, url_id, length) VALUES (@aid, @alid, @tid, @gid, @urli, @length); SELECT last_insert_rowid();";
+                    cmd.CommandText = "INSERT INTO TRACKS (artist_id, album_id, title_id, genre_id, url_id, length) VALUES (@aid, @alid, @tid, @gid, @urli, @length); SELECT last_insert_rowid();";
                     cmd.Parameters.AddWithValue("@aid", aid);
                     cmd.Parameters.AddWithValue("@alid", alid);
                     cmd.Parameters.AddWithValue("@tid", tid);
@@ -384,39 +384,39 @@ namespace MusicBeePlugin
                 command.CommandText = @"PRAGMA foreign_keys = ON;";
                 command.ExecuteNonQuery();
 
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Artists (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS ARTISTS (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Albums (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS ALBUMS (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Titles (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS TITLES (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Genres (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS GENRES (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS player_states (
-                    Id INTEGER PRIMARY KEY,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS PLAYER_STATES (
+                    ID INTEGER PRIMARY KEY,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS event_types (
-                    Id INTEGER PRIMARY KEY,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS EVENT_TYPES (
+                    ID INTEGER PRIMARY KEY,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Urls (
-                    Id INTEGER PRIMARY KEY,
-                    Value TEXT UNIQUE
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS URLS (
+                    ID INTEGER PRIMARY KEY,
+                    VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TRACKS (
