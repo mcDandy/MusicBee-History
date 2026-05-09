@@ -38,25 +38,26 @@ namespace MusicBeePlugin
                 SQLiteDataReader reader;
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"SELECT 
-                            a.Value AS Artist,
-                            ti.Value AS Title,
-                            al.Value AS Album,
-                            g.Value AS Genre,
-                            ps.Value AS Player_state,
-                            et.Value AS Event_type,
-                            h.Played AS Played,
-                            h.Time AS Time,
-                            tr.Length AS Lenght_of_media,
-                            u.Value AS Url
-                        FROM History h
-                        LEFT JOIN Artists a ON h.Artist_Id = a.Id
-                        LEFT JOIN Titles ti ON h.Title_Id = ti.Id
-                        LEFT JOIN Albums al ON h.Album_Id = al.Id
-                        LEFT JOIN Genres g ON h.Genre_Id = g.Id
-                        LEFT JOIN player_states ps ON h.player_state = ps.Id
-                        LEFT JOIN Urls u ON h.Url_Id = u.Id
-                        LEFT JOIN event_types et ON h.event_type = et.Id;";
+                    cmd.CommandText = @"
+    SELECT 
+        a.Value AS Artist,
+        ti.Value AS Title,
+        al.Value AS Album,
+        g.Value AS Genre,
+        ps.Value AS Player_state,
+        et.Value AS Event_type,
+        h.Played AS Played,
+        CAST(h.Time AS REAL) AS TimeValue,
+        h.Length AS Length_of_media,
+        u.Value AS Url
+    FROM History h
+    LEFT JOIN Artists a ON h.Artist = a.Id
+    LEFT JOIN Titles ti ON h.Title = ti.Id
+    LEFT JOIN Albums al ON h.Album = al.Id
+    LEFT JOIN Genres g ON h.Genre = g.Id
+    LEFT JOIN player_states ps ON h.player_state = ps.Id
+    LEFT JOIN Urls u ON h.Url = u.Id
+    LEFT JOIN event_types et ON h.event_type = et.Id;";
                     reader = cmd.ExecuteReader();
                 }
                 while (reader.Read()) // Prochází řádek po řádku
@@ -68,18 +69,19 @@ namespace MusicBeePlugin
                      mockGenre = reader["Genre"]?.ToString() ?? "Unknown Genre";
 
                      mockPlayed = reader["Played"] != DBNull.Value ? Convert.ToInt32(reader["Played"]) : 0;
-                     mockDuration = reader["Lenght_of_media"] != DBNull.Value ? Convert.ToInt32(reader["Lenght_of_media"]) : 0;
+                     mockDuration = reader["Length_of_media"] != DBNull.Value ? Convert.ToInt32(reader["Length_of_media"]) : 0;
 
                     // U Enumů pozor - pokud máš v DB text, použij Enum.Parse. Pokud číslo, stačí (PlayState)Convert.ToInt32(...)
-                    PlayState mockState = reader["Player_state"] != DBNull.Value ?
+                    mockState = reader["Player_state"] != DBNull.Value ?
                         (PlayState)Enum.Parse(typeof(PlayState), reader["Player_state"].ToString()) : PlayState.Stopped;
 
                     NotificationType mockEvent = reader["Event_type"] != DBNull.Value ?
                         (NotificationType)Enum.Parse(typeof(NotificationType), reader["Event_type"].ToString()) : NotificationType.PluginStartup;
 
                     // Pokud máš v DB Unix Timestamp jako double (s desetinami), tak raději:
-                    DateTime mockDateTime = reader["Time"] != DBNull.Value ?
-                        DateTimeOffset.FromUnixTimeSeconds((long)Convert.ToDouble(reader["Time"])).DateTime : DateTime.UtcNow;
+                     double timeValue = Convert.ToDouble(reader["TimeValue"]);
+                    long ticks = 621355968000000000L + (long)Math.Round(timeValue * TimeSpan.TicksPerSecond);
+                    mockDateTime = new DateTimeOffset(ticks, TimeSpan.Zero).UtcDateTime;
 
                     string mockUrl = reader["Url"]?.ToString() ?? "Unknown URL";
 
@@ -142,18 +144,18 @@ namespace MusicBeePlugin
                         using (SQLiteCommand cmd = conn.CreateCommand())
                         {
                             int? trackId = GetOrCreateTrackId(conn, aid, alid, tid, gid, urli, length);
-                            cmd.CommandText = @"INSERT INTO History 
-                                                (Track, player_state, event_type, Played,Length,Time, Url, Speed, Pitch, SampleRate) 
-                                                VALUES 
-                                                (@track, @player_state, @event_type, @played, @Length, @Time, @Url, @speed, @pitch, @sample_rate);";
-                            cmd.Parameters.AddWithValue("@track", trackId);
+                            cmd.CommandText = @"INSERT INTO HISTORY 
+                    (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, LENGTH, TIME, URL, SPEED, PITCH, SAMPLE_RATE) 
+                    VALUES 
+                    (@track_id, @player_state, @event_type, @played, @Length, @Time, @Url, @speed, @pitch, @sample_rate);";
+                            cmd.Parameters.AddWithValue("@track_id", trackId);
                             cmd.Parameters.AddWithValue("@player_state", (int)state);
                             cmd.Parameters.AddWithValue("@event_type", (int)event_type);
                             cmd.Parameters.AddWithValue("@speed", lastSpeed);
                             cmd.Parameters.AddWithValue("@pitch", lastPitch);
                             cmd.Parameters.AddWithValue("@sample_rate", lastSampleRate);
                             cmd.Parameters.AddWithValue("@played", played);
-                            cmd.Parameters.AddWithValue("@Time", (mockMode ? mockDateTime.Ticks : DateTime.UtcNow.Ticks - unixTicks) / 10_000_000d);
+                            cmd.Parameters.AddWithValue("@Time", (mockMode ? mockDateTime.Ticks : DateTime.UtcNow.Ticks - unixTicks) * 1.0d / TimeSpan.TicksPerSecond);
 
                             try
                             {
@@ -181,7 +183,7 @@ namespace MusicBeePlugin
                     // Najdi existujícího interpreta
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT Id FROM Artists WHERE Value = @name";
+                        cmd.CommandText = "SELECT ID FROM ARTISTS WHERE VALUE = @name";
                         cmd.Parameters.AddWithValue("@name", name);
                         object result = cmd.ExecuteScalar();
                         if (result != null)
@@ -190,7 +192,7 @@ namespace MusicBeePlugin
                     // Pokud neexistuje, vlož nového
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "INSERT INTO Artists (Value) VALUES (@name); SELECT last_insert_rowid();";
+                        cmd.CommandText = "INSERT INTO ARTISTS (VALUE) VALUES (@name); SELECT last_insert_rowid();";
                         cmd.Parameters.AddWithValue("@name", name);
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
@@ -373,7 +375,7 @@ namespace MusicBeePlugin
         private void InitDatabase()
         {
             string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-            string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
+            string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory2.db");
 
             using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
             {
@@ -417,34 +419,34 @@ namespace MusicBeePlugin
                     Value TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS Tracks (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Title_Id INTEGER,
-                    Artist_Id INTEGER,
-                    Album_Id INTEGER,
-                    Genre_Id INTEGER,
-                    Url_Id INTEGER,
-                    Length INTEGER,
-                    FOREIGN KEY(Title_Id) REFERENCES Titles(Id),
-                    FOREIGN KEY(Artist_Id) REFERENCES Artists(Id),
-                    FOREIGN KEY(Album_Id) REFERENCES Albums(Id),
-                    FOREIGN KEY(Genre_Id) REFERENCES Genres(Id),
-                    FOREIGN KEY(Url_Id) REFERENCES Urls(Id)
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS TRACKS (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TITLE_ID INTEGER,
+                    ARTIST_ID INTEGER,
+                    ALBUM_ID INTEGER,
+                    GENRE_ID INTEGER,
+                    URL_ID INTEGER,
+                    LENGTH INTEGER,
+                    FOREIGN KEY(TITLE_ID) REFERENCES TITLES(ID),
+                    FOREIGN KEY(ARTIST_ID) REFERENCES ARTISTS(ID),
+                    FOREIGN KEY(ALBUM_ID) REFERENCES ALBUMS(ID),
+                    FOREIGN KEY(GENRE_ID) REFERENCES GENRES(ID),
+                    FOREIGN KEY(URL_ID) REFERENCES URLS(ID)
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE TABLE IF NOT EXISTS History (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Track INTEGER,
-                    player_state integer,
-                    event_type integer,
-                    Played integer,
-                    Time TIMESTAMP DEFAULT(unixepoch('subsec')),
-                    speed integer,
-                    pitch integer,
-                    sample_rate integer,
-                    foreign key(Track) references Tracks(Id),
-                    foreign key(player_state) references player_states(Id),
-                    foreign key(event_type) references event_types(Id)
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS HISTORY (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TRACK_ID INTEGER,
+                    PLAYER_STATE INTEGER,
+                    EVENT_TYPE INTEGER,
+                    PLAYED INTEGER,
+                    TIME REAL,
+                    SPEED INTEGER,
+                    PITCH INTEGER,
+                    SAMPLE_RATE INTEGER,
+                    FOREIGN KEY(TRACK_ID) REFERENCES TRACKS(ID),
+                    FOREIGN KEY(PLAYER_STATE) REFERENCES PLAYER_STATES(ID),
+                    FOREIGN KEY(EVENT_TYPE) REFERENCES EVENT_TYPES(ID)
                 )";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
@@ -461,15 +463,16 @@ namespace MusicBeePlugin
                     ROUND(tr.Length / 1000.0, 2) AS Lenght_of_media_s,
                     ROUND((h.Played * 100.0) / tr.Length, 1) AS percent_played
                 FROM History h
-                LEFT JOIN Tracks tr ON h.Track_Id = tr.Id
-                LEFT JOIN Artists a ON tr.Artist_Id = a.Id
-                LEFT JOIN Titles ti ON tr.Title_Id = ti.Id
-                LEFT JOIN Albums al ON tr.Album_Id = al.Id
-                LEFT JOIN Genres g ON tr.Genre_Id = g.Id
-                LEFT JOIN player_states ps ON h.player_state = ps.Id
-                LEFT JOIN event_types et ON h.event_type = et.Id
+                LEFT JOIN TRACKS tr ON h.TRACK_ID = tr.ID
+                LEFT JOIN ARTISTS a ON tr.ARTIST_ID = a.ID
+                LEFT JOIN TITLES ti ON tr.TITLE_ID = ti.ID
+                LEFT JOIN ALBUMS al ON tr.ALBUM_ID = al.ID
+                LEFT JOIN GENRES g ON tr.GENRE_ID = g.ID
+                LEFT JOIN PLAYER_STATES ps ON h.PLAYER_STATE = ps.ID
+                LEFT JOIN EVENT_TYPES et ON h.EVENT_TYPE = et.ID
                 ORDER BY h.Time DESC;";
                 command.ExecuteNonQuery();
+                this.RunConversion();
             }
         }
     }
