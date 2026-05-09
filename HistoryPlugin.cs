@@ -71,7 +71,7 @@ namespace MusicBeePlugin
                         using (SQLiteCommand cmd = conn.CreateCommand())
                         {
                             int? trackId = GetOrCreateTrackId(conn, aid, alid, tid, gid, urli, length);
-                            cmd.CommandText = @"INSERT INTO HISTORY 
+                            cmd.CommandText =@"INSERT INTO HISTORY 
                                                 (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, TIME, SPEED, PITCH, SAMPLE_RATE) 
                                                 VALUES 
                                                 (@track_id, @player_state, @event_type, @played, @Time, @speed, @pitch, @sample_rate);";
@@ -391,7 +391,16 @@ namespace MusicBeePlugin
 
         public int OnDockablePanelCreated(Control panel)
         {
-            var historyPanel = new HistoryControl(Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
+            if (panel.InvokeRequired)
+            {
+                panel.BeginInvoke(new Action(() => OnDockablePanelCreated(panel)));
+                return -1;
+            }
+
+            panel.Controls.Clear();
+
+            var historyPanel = new HistoryControl(
+                Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
             {
                 Dock = DockStyle.Fill
             };
