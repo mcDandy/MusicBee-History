@@ -18,80 +18,6 @@ namespace MusicBeePlugin
         static int lastHeadPos = 0;
         const long unixTicks = 621355968000000000L;
 
-        static bool mockMode = false;
-        static PlayState mockState = PlayState.Stopped;
-        static string mockArtist = "Unknown Artist";
-        static string mockAlbum = "Unknown Album";
-        static string mockTitle = "Unknown Title";
-        static int mockDuration = 0;
-        static int mockPlayed = 0;
-        static string mockGenre = "Unknown Genre";
-        static DateTime mockDateTime = DateTime.UtcNow;
-
-        public void RunConversion()
-        {
-            mockMode = true;
-            string dbFullPath = System.IO.Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), "MusicBeeHistory.db");
-            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
-            {
-                conn.Open();
-                SQLiteDataReader reader;
-                using (SQLiteCommand cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = @"
-    SELECT 
-        a.Value AS Artist,
-        ti.Value AS Title,
-        al.Value AS Album,
-        g.Value AS Genre,
-        ps.Value AS Player_state,
-        et.Value AS Event_type,
-        h.Played AS Played,
-        CAST(h.Time AS REAL) AS TimeValue,
-        h.Length AS Length_of_media,
-        u.Value AS Url
-    FROM History h
-    LEFT JOIN Artists a ON h.Artist = a.Id
-    LEFT JOIN Titles ti ON h.Title = ti.Id
-    LEFT JOIN Albums al ON h.Album = al.Id
-    LEFT JOIN Genres g ON h.Genre = g.Id
-    LEFT JOIN player_states ps ON h.player_state = ps.Id
-    LEFT JOIN Urls u ON h.Url = u.Id
-    LEFT JOIN event_types et ON h.event_type = et.Id;";
-                    reader = cmd.ExecuteReader();
-                }
-                while (reader.Read()) // Prochází řádek po řádku
-                {
-                    // Teď už můžeš používat indexer přímo na readeru
-                    mockArtist = reader["Artist"]?.ToString() ?? "Unknown Artist";
-                     mockTitle = reader["Title"]?.ToString() ?? "Unknown Title";
-                     mockAlbum = reader["Album"]?.ToString() ?? "Unknown Album";
-                     mockGenre = reader["Genre"]?.ToString() ?? "Unknown Genre";
-
-                     mockPlayed = reader["Played"] != DBNull.Value ? Convert.ToInt32(reader["Played"]) : 0;
-                     mockDuration = reader["Length_of_media"] != DBNull.Value ? Convert.ToInt32(reader["Length_of_media"]) : 0;
-
-                    // U Enumů pozor - pokud máš v DB text, použij Enum.Parse. Pokud číslo, stačí (PlayState)Convert.ToInt32(...)
-                    mockState = reader["Player_state"] != DBNull.Value ?
-                        (PlayState)Enum.Parse(typeof(PlayState), reader["Player_state"].ToString()) : PlayState.Stopped;
-
-                    NotificationType mockEvent = reader["Event_type"] != DBNull.Value ?
-                        (NotificationType)Enum.Parse(typeof(NotificationType), reader["Event_type"].ToString()) : NotificationType.PluginStartup;
-
-                    // Pokud máš v DB Unix Timestamp jako double (s desetinami), tak raději:
-                     double timeValue = Convert.ToDouble(reader["TimeValue"]);
-                    long ticks = 621355968000000000L + (long)Math.Round(timeValue * TimeSpan.TicksPerSecond);
-                    mockDateTime = new DateTimeOffset(ticks, TimeSpan.Zero).UtcDateTime;
-
-                    string mockUrl = reader["Url"]?.ToString() ?? "Unknown URL";
-
-                    // Tady pak v ReceiveNotification musíš použít tyto "mock" hodnoty místo volání mbApiInterface
-                    ReceiveNotification(mockUrl, mockEvent);
-                }
-            }
-            mockMode = false;
-        }
-
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
             if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged }.Contains(event_type))
@@ -104,16 +30,16 @@ namespace MusicBeePlugin
                     lastSampleRate = int.Parse(urlParts[2]);
                 }
                 PlayState state = mbApiInterface.Player_GetPlayState();
-                int played = mockMode ? mockPlayed : mbApiInterface.Player_GetPosition();
-                int length = mockMode ? mockDuration : mbApiInterface.NowPlaying_GetDuration();
-                string artist = mockMode ? mockArtist : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
-                string album = mockMode ? mockAlbum : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
-                string title = mockMode ? mockTitle : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
-                string genre = mockMode ? mockGenre : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
+                int played =  mbApiInterface.Player_GetPosition();
+                int length =  mbApiInterface.NowPlaying_GetDuration();
+                string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
+                string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
+                string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
+                string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
 
                 if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
                 {
-                    played = lastHeadPos + (int)(mockMode ? mockDateTime - lastEventTime : DateTime.UtcNow - lastEventTime).TotalMilliseconds;
+                    played = lastHeadPos + (int)(DateTime.UtcNow - lastEventTime).TotalMilliseconds;
                 }
                 else if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Paused))
                 {
@@ -155,7 +81,7 @@ namespace MusicBeePlugin
                             cmd.Parameters.AddWithValue("@pitch", lastPitch);
                             cmd.Parameters.AddWithValue("@sample_rate", lastSampleRate);
                             cmd.Parameters.AddWithValue("@played", played);
-                            cmd.Parameters.AddWithValue("@Time", (mockMode ? mockDateTime.Ticks : DateTime.UtcNow.Ticks - unixTicks) * 1.0d / TimeSpan.TicksPerSecond);
+                            cmd.Parameters.AddWithValue("@Time", (DateTime.UtcNow.Ticks - unixTicks) * 1.0d / TimeSpan.TicksPerSecond);
 
                             try
                             {
