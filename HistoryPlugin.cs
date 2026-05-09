@@ -17,6 +17,17 @@ namespace MusicBeePlugin
         static int lastSampleRate = 0;
         static int lastHeadPos = 0;
         const long unixTicks = 621355968000000000L;
+
+        static bool mockMode = false;
+        static PlayState mockState = PlayState.Stopped;
+        static string mockArtist = "Unknown Artist";
+        static string mockAlbum = "Unknown Album";
+        static string mockTitle = "Unknown Title";
+        static int mockDuration = 0;
+        static int mockPlayed = 0;
+        static string mockGenre = "Unknown Genre";
+        static DateTime mockDateTime = DateTime.UtcNow;
+
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
             if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged }.Contains(event_type))
@@ -29,12 +40,12 @@ namespace MusicBeePlugin
                     lastSampleRate = int.Parse(urlParts[2]);
                 }
                 PlayState state = mbApiInterface.Player_GetPlayState();
-                int played = mbApiInterface.Player_GetPosition();
-                int length = mbApiInterface.NowPlaying_GetDuration();
-                string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
-                string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
-                string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
-                string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
+                int played = mockMode ? mockPlayed : mbApiInterface.Player_GetPosition();
+                int length = mockMode ? mockDuration : mbApiInterface.NowPlaying_GetDuration();
+                string artist = mockMode ? mockArtist : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
+                string album = mockMode ? mockAlbum : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
+                string title = mockMode ? mockTitle : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
+                string genre = mockMode ? mockGenre : mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
 
                 if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
                 {
@@ -52,7 +63,7 @@ namespace MusicBeePlugin
                 if (new PlayState[] { PlayState.Stopped, PlayState.Paused, PlayState.Playing }.Contains(state))
                 {
                     string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-                    string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
+                    string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory2.db");
 
                     using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
                     {
@@ -80,7 +91,7 @@ namespace MusicBeePlugin
                             cmd.Parameters.AddWithValue("@pitch", lastPitch);
                             cmd.Parameters.AddWithValue("@sample_rate", lastSampleRate);
                             cmd.Parameters.AddWithValue("@played", played);
-                            cmd.Parameters.AddWithValue("@Time", (DateTime.UtcNow.Ticks-unixTicks) / 10_000_000d);
+                            cmd.Parameters.AddWithValue("@Time", (mockMode ? mockDateTime.Ticks : DateTime.UtcNow.Ticks - unixTicks) / 10_000_000d);
 
                             try
                             {
