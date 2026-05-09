@@ -145,9 +145,9 @@ namespace MusicBeePlugin
                         {
                             int? trackId = GetOrCreateTrackId(conn, aid, alid, tid, gid, urli, length);
                             cmd.CommandText = @"INSERT INTO HISTORY 
-                    (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, LENGTH, TIME, URL, SPEED, PITCH, SAMPLE_RATE) 
+                    (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, TIME, SPEED, PITCH, SAMPLE_RATE) 
                     VALUES 
-                    (@track_id, @player_state, @event_type, @played, @Length, @Time, @Url, @speed, @pitch, @sample_rate);";
+                    (@track_id, @player_state, @event_type, @played, @Time, @speed, @pitch, @sample_rate);";
                             cmd.Parameters.AddWithValue("@track_id", trackId);
                             cmd.Parameters.AddWithValue("@player_state", (int)state);
                             cmd.Parameters.AddWithValue("@event_type", (int)event_type);
@@ -472,7 +472,6 @@ namespace MusicBeePlugin
                 LEFT JOIN EVENT_TYPES et ON h.EVENT_TYPE = et.ID
                 ORDER BY h.Time DESC;";
                 command.ExecuteNonQuery();
-                this.RunConversion();
             }
         }
     }
