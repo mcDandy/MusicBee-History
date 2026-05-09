@@ -104,7 +104,6 @@ namespace MusicBeePlugin
             {
                 if (!string.IsNullOrEmpty(name))
                 {
-                    // Najdi existujícího interpreta
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "SELECT ID FROM ARTISTS WHERE VALUE = @name";
@@ -113,7 +112,6 @@ namespace MusicBeePlugin
                         if (result != null)
                             return Convert.ToInt32(result);
                     }
-                    // Pokud neexistuje, vlož nového
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO ARTISTS (VALUE) VALUES (@name); SELECT last_insert_rowid();";
@@ -127,7 +125,6 @@ namespace MusicBeePlugin
             {
                 if (!string.IsNullOrEmpty(name))
                 {
-                    // Najdi existující žánr
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "SELECT ID FROM GENRES WHERE VALUE = @name";
@@ -136,7 +133,6 @@ namespace MusicBeePlugin
                         if (result != null)
                             return Convert.ToInt32(result);
                     }
-                    // Pokud neexistuje, vlož nový žánr
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO GENRES (VALUE) VALUES (@name); SELECT last_insert_rowid();";
@@ -150,7 +146,6 @@ namespace MusicBeePlugin
             {
                 if (!string.IsNullOrEmpty(name))
                 {
-                    // Najdi existující album
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "SELECT ID FROM ALBUMS WHERE VALUE = @name";
@@ -159,7 +154,6 @@ namespace MusicBeePlugin
                         if (result != null)
                             return Convert.ToInt32(result);
                     }
-                    // Pokud neexistuje, vlož nové album
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO ALBUMS (VALUE) VALUES (@name); SELECT last_insert_rowid();";
@@ -173,7 +167,6 @@ namespace MusicBeePlugin
             {
                 if (!string.IsNullOrEmpty(name))
                 {
-                    // Najdi existující titul
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "SELECT ID FROM TITLES WHERE VALUE = @name";
@@ -182,7 +175,6 @@ namespace MusicBeePlugin
                         if (result != null)
                             return Convert.ToInt32(result);
                     }
-                    // Pokud neexistuje, vlož nový titul
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO TITLES (VALUE) VALUES (@name); SELECT last_insert_rowid();";
@@ -207,7 +199,6 @@ namespace MusicBeePlugin
                     if (result != null)
                         return Convert.ToInt32(result);
                 }
-                // Pokud neexistuje, vlož nový titul
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO TRACKS (ARTIST_ID, ALBUM_ID, TITLE_ID, GENRE_ID, URL_ID, LENGTH) VALUES (@aid, @alid, @tid, @gid, @urli, @length); SELECT last_insert_rowid();";
@@ -231,7 +222,6 @@ namespace MusicBeePlugin
                     if (result != null)
                         return;
                 }
-                // Pokud neexistuje, vlož novou akci
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO PLAYER_STATES (ID,VALUE) VALUES (@id,@name);";
@@ -254,7 +244,6 @@ namespace MusicBeePlugin
                     if (result != null)
                         return;
                 }
-                // Pokud neexistuje, vlož novou akci
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO EVENT_TYPES (ID,VALUE) VALUES (@id,@name);";
@@ -275,7 +264,6 @@ namespace MusicBeePlugin
             {
                 if (!string.IsNullOrEmpty(url))
                 {
-                    // Najdi existující URL
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "SELECT ID FROM URLS WHERE VALUE = @url";
@@ -284,7 +272,6 @@ namespace MusicBeePlugin
                         if (result != null)
                             return Convert.ToInt32(result);
                     }
-                    // Pokud neexistuje, vlož nové URL
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO URLS (VALUE) VALUES (@url); SELECT last_insert_rowid();";
@@ -400,4 +387,3 @@ namespace MusicBeePlugin
         }
     }
 }
-S
