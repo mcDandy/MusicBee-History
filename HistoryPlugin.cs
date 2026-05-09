@@ -15,6 +15,7 @@ namespace MusicBeePlugin
         static int lastSampleRate = 0;
         static int lastHeadPos = 0;
         const long unixTicks = 621355968000000000L;
+        private const string DBNAME = "MusicBeeHistory.db";
 
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
@@ -37,7 +38,7 @@ namespace MusicBeePlugin
 
                 if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing) || (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
                 {
-                    played = lastHeadPos + (int)(DateTime.UtcNow - lastEventTime).TotalMilliseconds;
+                    played = lastHeadPos + (int)((DateTime.UtcNow - lastEventTime).TotalMilliseconds*((lastSpeed+100)/100.0 * (lastSampleRate+100)/100.0));
                 }
                 else if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused) || (played == 0 && state == PlayState.Stopped && lastState == PlayState.Paused))
                 {
@@ -51,7 +52,7 @@ namespace MusicBeePlugin
                 if (new PlayState[] { PlayState.Stopped, PlayState.Paused, PlayState.Playing }.Contains(state))
                 {
                     string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-                    string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
+                    string dbFullPath = System.IO.Path.Combine(appDataPath, DBNAME);
 
                     using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
                     {
@@ -286,7 +287,7 @@ namespace MusicBeePlugin
         private void InitDatabase()
         {
             string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-            string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
+            string dbFullPath = System.IO.Path.Combine(appDataPath, DBNAME);
 
             using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
             {
