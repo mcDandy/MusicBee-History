@@ -20,7 +20,7 @@ namespace MusicBeePlugin
         {
             if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged }.Contains(event_type))
             {
-                if(event_type == NotificationType.TempoSetOrChanged)
+                if (event_type == NotificationType.TempoSetOrChanged)
                 {
                     string[] urlParts = sourceFileUrl.Split(';');
                     lastSpeed = int.Parse(urlParts[0]);
@@ -28,18 +28,18 @@ namespace MusicBeePlugin
                     lastSampleRate = int.Parse(urlParts[2]);
                 }
                 PlayState state = mbApiInterface.Player_GetPlayState();
-                int played =  mbApiInterface.Player_GetPosition();
-                int length =  mbApiInterface.NowPlaying_GetDuration();
+                int played = mbApiInterface.Player_GetPosition();
+                int length = mbApiInterface.NowPlaying_GetDuration();
                 string artist = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Artist);
                 string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
                 string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
                 string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
 
-                if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
+                if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing) || (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
                 {
                     played = lastHeadPos + (int)(DateTime.UtcNow - lastEventTime).TotalMilliseconds;
                 }
-                else if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused)|| (played == 0 && state == PlayState.Stopped && lastState == PlayState.Paused))
+                else if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused) || (played == 0 && state == PlayState.Stopped && lastState == PlayState.Paused))
                 {
                     played = lastHeadPos;
                 }
@@ -69,9 +69,9 @@ namespace MusicBeePlugin
                         {
                             int? trackId = GetOrCreateTrackId(conn, aid, alid, tid, gid, urli, length);
                             cmd.CommandText = @"INSERT INTO HISTORY 
-                    (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, TIME, SPEED, PITCH, SAMPLE_RATE) 
-                    VALUES 
-                    (@track_id, @player_state, @event_type, @played, @Time, @speed, @pitch, @sample_rate);";
+                                                (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, TIME, SPEED, PITCH, SAMPLE_RATE) 
+                                                VALUES 
+                                                (@track_id, @player_state, @event_type, @played, @Time, @speed, @pitch, @sample_rate);";
                             cmd.Parameters.AddWithValue("@track_id", trackId);
                             cmd.Parameters.AddWithValue("@player_state", (int)state);
                             cmd.Parameters.AddWithValue("@event_type", (int)event_type);
@@ -400,3 +400,4 @@ namespace MusicBeePlugin
         }
     }
 }
+S
