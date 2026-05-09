@@ -96,6 +96,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="HistoryControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="HistoryControl.Designer.cs">
+      <DependentUpon>HistoryControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="HistoryPlugin.cs" />
     <Compile Include="MusicBeeInterface.cs" />
     <Compile Include="TestCSharpDll.cs" />
@@ -130,6 +136,9 @@
   <ItemGroup>
     <EmbeddedResource Include="costura-win-x86\SQLite.Interop.dll" />
     <EmbeddedResource Include="costura-win-x64\SQLite.Interop.dll" />
+    <EmbeddedResource Include="HistoryControl.resx">
+      <DependentUpon>HistoryControl.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

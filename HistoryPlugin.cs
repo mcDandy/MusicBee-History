@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Data.SQLite;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using MusicBeePlugin;
 
 namespace MusicBeePlugin
 {
@@ -385,6 +387,17 @@ namespace MusicBeePlugin
                 ORDER BY h.Time DESC;";
                 command.ExecuteNonQuery();
             }
+        }
+
+        public int OnDockablePanelCreated(Control panel)
+        {
+            var historyPanel = new HistoryControl(Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
+            {
+                Dock = DockStyle.Fill
+            };
+
+            panel.Controls.Add(historyPanel);
+            return -1;
         }
     }
 }
