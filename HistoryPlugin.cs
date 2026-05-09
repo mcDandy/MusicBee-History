@@ -51,7 +51,7 @@ namespace MusicBeePlugin
                 if (new PlayState[] { PlayState.Stopped, PlayState.Paused, PlayState.Playing }.Contains(state))
                 {
                     string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-                    string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory2.db");
+                    string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
 
                     using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
                     {
@@ -286,7 +286,7 @@ namespace MusicBeePlugin
         private void InitDatabase()
         {
             string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-            string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory2.db");
+            string dbFullPath = System.IO.Path.Combine(appDataPath, "MusicBeeHistory.db");
 
             using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
             {
