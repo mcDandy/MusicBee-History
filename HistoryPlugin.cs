@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Data.SQLite;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Security.Policy;
 using System.Windows.Forms;
 
 namespace MusicBeePlugin
@@ -198,7 +196,7 @@ namespace MusicBeePlugin
             {
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT ID FROM TRACKS WHERE artist_id = @aid AND album_id = @alid AND title_id = @tid AND genre_id = @gid AND url_id = @urli AND abs(length - @length) < 100";
+                    cmd.CommandText = "SELECT ID FROM TRACKS WHERE ARTIST_ID = @aid AND ALBUM_ID = @alid AND TITLE_ID = @tid AND GENRE_ID = @gid AND URL_ID = @urli AND abs(length - @length) < 100";
                     cmd.Parameters.AddWithValue("@aid", aid);
                     cmd.Parameters.AddWithValue("@alid", alid);
                     cmd.Parameters.AddWithValue("@tid", tid);
@@ -212,7 +210,7 @@ namespace MusicBeePlugin
                 // Pokud neexistuje, vlož nový titul
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO TRACKS (artist_id, album_id, title_id, genre_id, url_id, length) VALUES (@aid, @alid, @tid, @gid, @urli, @length); SELECT last_insert_rowid();";
+                    cmd.CommandText = "INSERT INTO TRACKS (ARTIST_ID, ALBUM_ID, TITLE_ID, GENRE_ID, URL_ID, LENGTH) VALUES (@aid, @alid, @tid, @gid, @urli, @length); SELECT last_insert_rowid();";
                     cmd.Parameters.AddWithValue("@aid", aid);
                     cmd.Parameters.AddWithValue("@alid", alid);
                     cmd.Parameters.AddWithValue("@tid", tid);
@@ -227,7 +225,7 @@ namespace MusicBeePlugin
 
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT Id FROM player_states WHERE Value = @name";
+                    cmd.CommandText = "SELECT ID FROM PLAYER_STATES WHERE VALUE = @name";
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     object result = cmd.ExecuteScalar();
                     if (result != null)
@@ -236,7 +234,7 @@ namespace MusicBeePlugin
                 // Pokud neexistuje, vlož novou akci
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO player_states (Id,Value) VALUES (@id,@name);";
+                    cmd.CommandText = "INSERT INTO PLAYER_STATES (ID,VALUE) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
 
@@ -250,7 +248,7 @@ namespace MusicBeePlugin
 
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT Id FROM event_types WHERE Value = @name";
+                    cmd.CommandText = "SELECT ID FROM EVENT_TYPES WHERE VALUE = @name";
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     object result = cmd.ExecuteScalar();
                     if (result != null)
@@ -259,7 +257,7 @@ namespace MusicBeePlugin
                 // Pokud neexistuje, vlož novou akci
                 using (SQLiteCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "INSERT INTO event_types (Id,Value) VALUES (@id,@name);";
+                    cmd.CommandText = "INSERT INTO EVENT_TYPES (ID,VALUE) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
                     try
@@ -280,7 +278,7 @@ namespace MusicBeePlugin
                     // Najdi existující URL
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT Id FROM Urls WHERE Value = @url";
+                        cmd.CommandText = "SELECT ID FROM URLS WHERE VALUE = @url";
                         cmd.Parameters.AddWithValue("@url", url);
                         object result = cmd.ExecuteScalar();
                         if (result != null)
@@ -289,7 +287,7 @@ namespace MusicBeePlugin
                     // Pokud neexistuje, vlož nové URL
                     using (SQLiteCommand cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "INSERT INTO Urls (Value) VALUES (@url); SELECT last_insert_rowid();";
+                        cmd.CommandText = "INSERT INTO URLS (VALUE) VALUES (@url); SELECT last_insert_rowid();";
                         cmd.Parameters.AddWithValue("@url", url);
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
