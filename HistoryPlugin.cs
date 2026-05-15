@@ -13,7 +13,7 @@ namespace MusicBeePlugin
         static PlayState lastState = PlayState.Stopped;
         static DateTime lastEventTime = DateTime.UtcNow;
         static int lastSpeed = 0;
-        static int lastPitch = 0;
+        static float lastPitch = 0;
         static int lastSampleRate = 0;
         static int lastHeadPos = 0;
         const long unixTicks = 621355968000000000L;
@@ -27,7 +27,7 @@ namespace MusicBeePlugin
                 {
                     string[] urlParts = sourceFileUrl.Split(';');
                     lastSpeed = int.Parse(urlParts[0]);
-                    lastPitch = int.Parse(urlParts[1]);
+                    lastPitch = float.Parse(urlParts[1]);
                     lastSampleRate = int.Parse(urlParts[2]);
                 }
                 PlayState state = mbApiInterface.Player_GetPlayState();
