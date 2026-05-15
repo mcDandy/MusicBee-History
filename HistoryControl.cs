@@ -99,7 +99,6 @@ namespace MusicBeePlugin
                                ) h
                                JOIN Artists a ON h.Artist_Id = a.Id
                                JOIN Titles t ON h.Title_Id = t.Id
-                               -- Filtrujeme až finální úseky, které odpovídají reálnému poslechu (konec tracku nebo pauza/stop)
                                WHERE h.Realtime_Min > 0 
                                  AND (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
                                GROUP BY a.Value, t.Value

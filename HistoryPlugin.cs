@@ -29,6 +29,7 @@ namespace MusicBeePlugin
                     lastSpeed = int.Parse(urlParts[0]);
                     lastPitch = float.Parse(urlParts[1]);
                     lastSampleRate = int.Parse(urlParts[2]);
+                    sourceFileUrl = mbApiInterface.NowPlaying_GetFileUrl();
                 }
                 PlayState state = mbApiInterface.Player_GetPlayState();
                 int played = mbApiInterface.Player_GetPosition();
