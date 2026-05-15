@@ -98,6 +98,66 @@ namespace MusicBeePlugin
                 MessageBox.Show(ex.ToString());
             }
         }
+        private void LoadHistoryGrid()
+        {
+            try
+            {
+                string sql = @"
+                            WITH BASE AS (
+                                SELECT
+                                    h.ID,
+                                    h.TIME,
+                                    h.TRACK_ID,
+                                    a.VALUE  AS ARTIST,
+                                    al.VALUE AS ALBUM,
+                                    (h.PLAYED - COALESCE(
+                                        (
+                                            SELECT h2.PLAYED
+                                            FROM HISTORY h2
+                                            WHERE h2.TRACK_ID = h.TRACK_ID
+                                              AND h2.ID < h.ID
+                                            ORDER BY h2.ID DESC
+                                            LIMIT 1
+                                        ), 0
+                                    )) AS DELTA_PLAYED_MS,
+
+                                    ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
+                                    h.PITCH                            AS PITCH_SEMITONES,
+                                    ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
+                                FROM HISTORY h
+                                JOIN TRACKS  tr ON tr.ID = h.TRACK_ID
+                                JOIN ARTISTS a  ON a.ID  = tr.ARTIST_ID
+                                JOIN ALBUMS  al ON al.ID = tr.ALBUM_ID
+                                WHERE (h.EVENT_TYPE = 16 OR (h.EVENT_TYPE = 2 AND h.PLAYER_STATE IN (6, 7))                            )
+                            )
+                            SELECT
+                                datetime(MIN(TIME), 'unixepoch', 'localtime') AS TIME,
+                                ARTIST,
+                                ALBUM,
+                                ROUND(SUM(CASE WHEN DELTA_PLAYED_MS > 0 THEN DELTA_PLAYED_MS ELSE 0 END) / 1000.0, 2) AS PLAYED_LENGTH_S,
+                                ROUND(SUM(CASE WHEN DELTA_PLAYED_MS > 0 THEN DELTA_PLAYED_MS ELSE 0 END) / 1000.0 *AVG(SPEED_MULT)*AVG(SAMPLE_RATE_MULT), 2) AS PLAYED_REALTIME_S,
+                                ROUND(AVG(SPEED_MULT), 4)       AS AVG_SPEED,
+                                ROUND(AVG(PITCH_SEMITONES), 3)  AS AVG_PITCH,
+                                ROUND(AVG(SAMPLE_RATE_MULT), 4) AS AVG_SAMPLE_RATE
+                            FROM BASE
+                            GROUP BY TRACK_ID, ARTIST, ALBUM, date(TIME, 'unixepoch', 'localtime')
+                            ORDER BY MIN(TIME) DESC;";
+
+                var table = new DataTable();
+                using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
+                using (var adapter = new SQLiteDataAdapter(sql, conn))
+                {
+                    adapter.Fill(table);
+                }
+
+                dataGridView1.AutoGenerateColumns = true;
+                dataGridView1.DataSource = table;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+        }
 
         private void HistoryTabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -109,6 +169,10 @@ namespace MusicBeePlugin
             {
                 LoadTopSongsGrid();
 
+            }
+            if (historyTabControl.SelectedTab == tabPage3)
+            {
+                LoadHistoryGrid();
             }
         }
 }
