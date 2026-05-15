@@ -395,21 +395,37 @@ namespace MusicBeePlugin
 
         public int OnDockablePanelCreated(Control panel)
         {
-            if (panel.InvokeRequired)
+            void BuildPanel()
             {
-                panel.BeginInvoke(new Action(() => OnDockablePanelCreated(panel)));
-                return -1;
+                panel.SuspendLayout();
+                panel.Controls.Clear();
+
+                var historyPanel = new HistoryControl(
+                    Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
+                {
+                    AutoSize = false,
+                    Dock = DockStyle.None,
+                    Margin = Padding.Empty,
+                    Padding = Padding.Empty
+                };
+
+                panel.Controls.Add(historyPanel);
+
+                void ResizeChild(object s, EventArgs e)
+                {
+                    historyPanel.Bounds = panel.ClientRectangle;
+                }
+
+                panel.Resize -= ResizeChild;
+                panel.Resize += ResizeChild;
+                ResizeChild(panel, EventArgs.Empty);
+
+                panel.ResumeLayout(true);
             }
 
-            panel.Controls.Clear();
+            if (panel.InvokeRequired) panel.Invoke((MethodInvoker)BuildPanel);
+            else BuildPanel();
 
-            var historyPanel = new HistoryControl(
-                Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
-            {
-                Dock = DockStyle.Fill
-            };
-
-            panel.Controls.Add(historyPanel);
             return -1;
         }
     }

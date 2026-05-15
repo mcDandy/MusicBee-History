@@ -13,6 +13,10 @@ namespace MusicBeePlugin
         {
             InitializeComponent();
             _dbPath = dbPath;
+
+            Dock = DockStyle.Fill;
+            AutoSize = false;
+
             Load += HistoryControl_Load;
         }
 
@@ -105,45 +109,66 @@ namespace MusicBeePlugin
             try
             {
                 string sql = @"
-                            WITH BASE AS (
-                                SELECT
-                                    h.ID,
-                                    h.TIME,
-                                    h.TRACK_ID,
-                                    a.VALUE  AS ARTIST,
-                                    al.VALUE AS ALBUM,
-                                    (h.PLAYED - COALESCE(
-                                        (
-                                            SELECT h2.PLAYED
-                                            FROM HISTORY h2
-                                            WHERE h2.TRACK_ID = h.TRACK_ID
-                                              AND h2.ID < h.ID
-                                            ORDER BY h2.ID DESC
-                                            LIMIT 1
-                                        ), 0
-                                    )) AS DELTA_PLAYED_MS,
-
-                                    ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
-                                    h.PITCH                            AS PITCH_SEMITONES,
-                                    ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
-                                FROM HISTORY h
-                                JOIN TRACKS  tr ON tr.ID = h.TRACK_ID
-                                JOIN ARTISTS a  ON a.ID  = tr.ARTIST_ID
-                                JOIN ALBUMS  al ON al.ID = tr.ALBUM_ID
-                                WHERE (h.EVENT_TYPE = 16 OR (h.EVENT_TYPE = 2 AND h.PLAYER_STATE IN (6, 7))                            )
-                            )
-                            SELECT
-                                datetime(MIN(TIME), 'unixepoch', 'localtime') AS TIME,
-                                ARTIST,
-                                ALBUM,
-                                ROUND(SUM(CASE WHEN DELTA_PLAYED_MS > 0 THEN DELTA_PLAYED_MS ELSE 0 END) / 1000.0, 2) AS PLAYED_LENGTH_S,
-                                ROUND(SUM(CASE WHEN DELTA_PLAYED_MS > 0 THEN DELTA_PLAYED_MS ELSE 0 END) / 1000.0 *AVG(SPEED_MULT)*AVG(SAMPLE_RATE_MULT), 2) AS PLAYED_REALTIME_S,
-                                ROUND(AVG(SPEED_MULT), 4)       AS AVG_SPEED,
-                                ROUND(AVG(PITCH_SEMITONES), 3)  AS AVG_PITCH,
-                                ROUND(AVG(SAMPLE_RATE_MULT), 4) AS AVG_SAMPLE_RATE
-                            FROM BASE
-                            GROUP BY TRACK_ID, ARTIST, ALBUM, date(TIME, 'unixepoch', 'localtime')
-                            ORDER BY MIN(TIME) DESC;";
+WITH RAW_EVENTS AS (
+    SELECT
+        h.ID,
+        h.TIME,
+        tr.TITLE_ID,
+        tr.ARTIST_ID,
+        tr.ALBUM_ID,
+        a.VALUE  AS ARTIST,
+        al.VALUE AS ALBUM,
+        ti.VALUE AS TRACK,
+        h.PLAYED,
+        ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
+        h.PITCH                            AS PITCH_SEMITONES,
+        ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
+    FROM HISTORY h
+    JOIN TRACKS tr ON tr.ID = h.TRACK_ID
+    JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
+    JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
+    JOIN TITLES ti ON ti.ID = tr.TITLE_ID
+    WHERE h.EVENT_TYPE IN (1, 2, 16, 17, 48)
+),
+LAGGED_EVENTS AS (
+    SELECT *,
+           LAG(TITLE_ID) OVER (ORDER BY ID) AS PREV_TITLE_ID,
+           LAG(PLAYED) OVER (ORDER BY ID) AS PREV_PLAYED,
+           CASE 
+               WHEN LAG(TITLE_ID) OVER (ORDER BY ID) <> TITLE_ID 
+                 OR LAG(ARTIST_ID) OVER (ORDER BY ID) <> ARTIST_ID 
+                 OR LAG(ALBUM_ID) OVER (ORDER BY ID) <> ALBUM_ID THEN 1 
+               ELSE 0 
+           END AS IS_NEW_SESSION
+    FROM RAW_EVENTS
+),
+SESSIONS AS (
+    SELECT *,
+           SUM(IS_NEW_SESSION) OVER (ORDER BY ID) AS SESSION_ID
+    FROM LAGGED_EVENTS
+),
+CLEAN AS (
+    SELECT
+        TIME, ARTIST, ALBUM, TRACK, SESSION_ID,
+        CASE
+            WHEN PREV_TITLE_ID = TITLE_ID AND PLAYED >= PREV_PLAYED THEN (PLAYED - PREV_PLAYED)
+            ELSE 0
+        END AS DELTA_POS_MS,
+        SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
+    FROM SESSIONS
+)
+-- 5. FINÁLNÍ SESKUPENÍ: Sloučí všechny dílčí eventy do jednoho řádku podle SESSION_ID
+SELECT
+    datetime(MIN(TIME), 'unixepoch', 'localtime') AS TIME,
+    ARTIST, ALBUM, TRACK,
+    ROUND(SUM(DELTA_POS_MS) / 1000.0, 2) AS PLAYED_LENGTH_S,
+    ROUND(SUM(DELTA_POS_MS * SPEED_MULT * SAMPLE_RATE_MULT) / 1000.0, 2) AS PLAYED_REALTIME_S,
+    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SPEED_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SPEED_MULT,
+    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 0.0 ELSE SUM(DELTA_POS_MS * PITCH_SEMITONES) / (SUM(DELTA_POS_MS) * 1.0) END, 3) AS AVG_PITCH,
+    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
+FROM CLEAN
+GROUP BY SESSION_ID, ARTIST, ALBUM, TRACK
+ORDER BY MIN(TIME) DESC;";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
@@ -176,6 +201,36 @@ namespace MusicBeePlugin
             {
                 LoadHistoryGrid();
             }
+        }
+
+        private void dataGridView2_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
+        }
+
+        private void tabPage1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
+        }
+
+        private void tabPage2_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void tabPage3_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void dataGridView3_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
         }
     }
 }
