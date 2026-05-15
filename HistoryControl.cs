@@ -175,4 +175,5 @@ namespace MusicBeePlugin
                 LoadHistoryGrid();
             }
         }
+    }
 }
