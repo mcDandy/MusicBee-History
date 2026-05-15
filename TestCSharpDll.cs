@@ -38,7 +38,7 @@ namespace MusicBeePlugin
             catch (Exception ex)
             {
                 // Tohle vám řekne přesně, co chybí
-                System.Windows.Forms.MessageBox.Show(ex.Message + "\n\n" + ex.StackTrace);
+                MessageBox.Show(ex.Message + "\n\n" + ex.StackTrace);
                 return null;
             }
         }
@@ -52,7 +52,7 @@ namespace MusicBeePlugin
             // if about.ConfigurationPanelHeight is set to 0, you can display your own popup window
             if (panelHandle != IntPtr.Zero)
             {
-                Panel configPanel = (Panel)Panel.FromHandle(panelHandle);
+                Panel configPanel = (Panel)Control.FromHandle(panelHandle);
                 Label prompt = new Label();
                 prompt.AutoSize = true;
                 prompt.Location = new Point(0, 0);
