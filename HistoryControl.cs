@@ -19,6 +19,8 @@ namespace MusicBeePlugin
         private void HistoryControl_Load(object sender, EventArgs e)
         {
             LoadArtistTimeGrid();
+            LoadHistoryGrid();
+            LoadTopSongsGrid();
         }
 
         private void LoadArtistTimeGrid()
@@ -90,8 +92,8 @@ namespace MusicBeePlugin
                     adapter.Fill(table);
                 }
 
-                dataGridView1.AutoGenerateColumns = true;
-                dataGridView1.DataSource = table;
+                dataGridView2.AutoGenerateColumns = true;
+                dataGridView2.DataSource = table;
             }
             catch (Exception ex)
             {
@@ -150,8 +152,8 @@ namespace MusicBeePlugin
                     adapter.Fill(table);
                 }
 
-                dataGridView1.AutoGenerateColumns = true;
-                dataGridView1.DataSource = table;
+                dataGridView3.AutoGenerateColumns = true;
+                dataGridView3.DataSource = table;
             }
             catch (Exception ex)
             {
