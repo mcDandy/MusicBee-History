@@ -31,22 +31,28 @@ namespace MusicBeePlugin
         {
             try
             {
-                var sql = @"
-                            SELECT 
-                                a.Value as Artist,
-                                ROUND(SUM(h.min) / 60000.0, 2) as MinutesPlayed
+                var sql = @"SELECT 
+                                a.Value AS Artist,
+                                ROUND(SUM(Realtime_Min), 2) AS MinutesPlayed
                             FROM (
                                 SELECT 
                                     tr.Artist_Id, 
-                                    (h.Played - COALESCE(LAG(h.Played) OVER (PARTITION BY h.Track_Id ORDER BY h.Id), 0)) / 
-                                    ((100.0 + h.speed) / 100.0) * ((100.0 + h.sample_rate) / 100.0) as min,
-                                    h.Time
+                                    CASE 
+                                        WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id 
+                                             AND h.Played >= LAG(h.Played) OVER (ORDER BY h.Id) 
+                                        THEN (h.Played - LAG(h.Played) OVER (ORDER BY h.Id)) 
+                                             / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) ) -- Správné dělení rychlostmi pro reálný čas
+                                             / 60000.0 -- Převod z milisekund na minuty
+                                        ELSE 0 
+                                    END AS Realtime_Min,
+                                    h.Event_Type,
+                                    h.Player_State
                                 FROM History h
                                 JOIN Tracks tr ON h.Track_Id = tr.Id
-                                WHERE (h.event_type = 16 OR (h.event_type = 2 AND h.player_state IN (6, 7)))
                             ) h
                             JOIN Artists a ON h.Artist_Id = a.Id
-                            WHERE h.min > 0 
+                            WHERE h.Realtime_Min > 0 
+                              AND (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
                             GROUP BY a.Value
                             ORDER BY MinutesPlayed DESC;";
 
@@ -69,25 +75,35 @@ namespace MusicBeePlugin
         {
             try
             {
-                string sql = @"
-                            SELECT 
-                                a.Value as Artist, t.Value as Title,
-                                ROUND(SUM(h.min) / 60000.0, 2) as MinutesPlayed
-                            FROM (
-                                SELECT 
-                                    tr.Artist_Id, tr.Title_id, 
-                                    (h.Played - COALESCE(LAG(h.Played) OVER (PARTITION BY h.Track_Id ORDER BY h.Id), 0)) / 
-                                    ((100.0 + h.speed) / 100.0) * ((100.0 + h.sample_rate) / 100.0) as min,
-                                    h.Time
-                                FROM History h
-                                JOIN Tracks tr ON h.Track_Id = tr.Id
-                                WHERE (h.event_type = 16 OR (h.event_type = 2 AND h.player_state IN (6, 7)))
-                            ) h
-                            JOIN Artists a ON h.Artist_Id = a.Id
-                            JOIN Titles t ON h.Title_id = t.Id
-                            WHERE h.min > 0 
-                            GROUP BY a.Value, t.Value
-                            ORDER BY MinutesPlayed DESC;";
+                string sql = @"SELECT 
+                                   a.Value AS Artist, 
+                                   t.Value AS Title,
+                                   ROUND(SUM(Realtime_Min), 2) AS MinutesPlayed
+                               FROM (
+                                   SELECT 
+                                       tr.Artist_Id, 
+                                       tr.Title_Id,
+                                       CASE 
+                                           -- Počítáme deltu pouze pokud navazuje stejná skladba (podle stabilního Title_Id)
+                                           WHEN LAG(tr.Title_Id) OVER (ORDER BY h.Id) = tr.Title_Id 
+                                                AND h.Played >= LAG(h.Played) OVER (ORDER BY h.Id) 
+                                           THEN (h.Played - LAG(h.Played) OVER (ORDER BY h.Id)) 
+                                                / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) ) -- Dělení oběma násobiči pro reálný čas
+                                                / 60000.0 -- Převod z milisekund na minuty
+                                           ELSE 0 
+                                       END AS Realtime_Min,
+                                       h.Event_Type,
+                                       h.Player_State
+                                   FROM History h
+                                   JOIN Tracks tr ON h.Track_Id = tr.Id
+                               ) h
+                               JOIN Artists a ON h.Artist_Id = a.Id
+                               JOIN Titles t ON h.Title_Id = t.Id
+                               -- Filtrujeme až finální úseky, které odpovídají reálnému poslechu (konec tracku nebo pauza/stop)
+                               WHERE h.Realtime_Min > 0 
+                                 AND (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
+                               GROUP BY a.Value, t.Value
+                               ORDER BY MinutesPlayed DESC;";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
