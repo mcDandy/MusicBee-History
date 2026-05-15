@@ -363,9 +363,9 @@ namespace MusicBeePlugin
                     FOREIGN KEY(EVENT_TYPE) REFERENCES EVENT_TYPES(ID)
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX idx_history_track_id_lookup ON HISTORY (TRACK_ID, ID DESC, PLAYED);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_track_id_lookup ON HISTORY (TRACK_ID, ID DESC, PLAYED);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX idx_history_events ON HISTORY(EVENT_TYPE, PLAYER_STATE);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_events ON HISTORY(EVENT_TYPE, PLAYER_STATE);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
                 SELECT 
