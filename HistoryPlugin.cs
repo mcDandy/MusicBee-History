@@ -21,7 +21,10 @@ namespace MusicBeePlugin
 
         public void ReceiveNotification(string sourceFileUrl, NotificationType event_type)
         {
-            if (new NotificationType[] { NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup, NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged }.Contains(event_type))
+            if (new NotificationType[] {
+                NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup,
+                NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged, NotificationType.AutoDjStarted,NotificationType.AutoDjStopped
+            }.Contains(event_type))
             {
                 if (event_type == NotificationType.TempoSetOrChanged)
                 {
