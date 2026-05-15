@@ -323,7 +323,7 @@ namespace MusicBeePlugin
                 )";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS PLAYER_STATES (
-                    ID INTEGER PRIMARY KEY,
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();

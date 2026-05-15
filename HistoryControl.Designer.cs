@@ -46,9 +46,9 @@
             // 
             // historyTabControl
             // 
+            this.historyTabControl.Controls.Add(this.tabPage3);
             this.historyTabControl.Controls.Add(this.tabPage1);
             this.historyTabControl.Controls.Add(this.tabPage2);
-            this.historyTabControl.Controls.Add(this.tabPage3);
             this.historyTabControl.Dock = System.Windows.Forms.DockStyle.Fill;
             this.historyTabControl.Location = new System.Drawing.Point(0, 0);
             this.historyTabControl.Name = "historyTabControl";
