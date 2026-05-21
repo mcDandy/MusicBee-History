@@ -427,6 +427,14 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_volume_lookup ON HISTORY(VOLUME_LEVEL, VOLUME_MUTE);";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_playerstate_id ON HISTORY (PLAYER_STATE, ID DESC);";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_trackid_time ON HISTORY (TRACK_ID, TIME);";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_time ON HISTORY (TIME);";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_title_id ON TRACKS (TITLE_ID);";
+                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
                 SELECT 
                     h.Id,

@@ -38,21 +38,24 @@ namespace MusicBeePlugin
                                 SELECT 
                                     tr.Artist_Id, 
                                     CASE 
+                                        -- Sledujeme časovou osu interpreta napříč celou historií
                                         WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id 
                                              AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id) 
+                                             AND (
+                                                (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
+                                                OR 
+                                                (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 16 OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
+                                             )
                                         THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
-                                             / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) ) -- Správné dělení rychlostmi pro reálný čas
-                                             / 60000.0 -- Převod z milisekund na minuty
+                                             / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
+                                             / 60000.0
                                         ELSE 0 
-                                    END AS Realtime_Min,
-                                    h.Event_Type,
-                                    h.Player_State
+                                    END AS Realtime_Min
                                 FROM History h
                                 JOIN Tracks tr ON h.Track_Id = tr.Id
                             ) h
                             JOIN Artists a ON h.Artist_Id = a.Id
                             WHERE h.Realtime_Min > 0 
-                              AND (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
                             GROUP BY a.Value
                             ORDER BY MinutesPlayed DESC;";
 
@@ -84,23 +87,26 @@ namespace MusicBeePlugin
                                        tr.Artist_Id, 
                                        tr.Title_Id,
                                        CASE 
-                                           -- Počítáme deltu pouze pokud navazuje stejná skladba (podle stabilního Title_Id)
+                                           -- Porovnáváme s absolutně předchozím řádkem v celé historii
                                            WHEN LAG(tr.Title_Id) OVER (ORDER BY h.Id) = tr.Title_Id 
-                                                AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id) 
+                                                AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)
+                                                -- Výpočet provedeme, pouze pokud aktuální NEBO předchozí řádek byl hrací event
+                                                AND (
+                                                   (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
+                                                   OR 
+                                                   (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 16 OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
+                                                )
                                            THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
-                                                / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) ) -- Dělení oběma násobiči pro reálný čas
-                                                / 60000.0 -- Převod z milisekund na minuty
+                                                / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
+                                                / 60000.0
                                            ELSE 0 
-                                       END AS Realtime_Min,
-                                       h.Event_Type,
-                                       h.Player_State
+                                       END AS Realtime_Min
                                    FROM History h
                                    JOIN Tracks tr ON h.Track_Id = tr.Id
                                ) h
                                JOIN Artists a ON h.Artist_Id = a.Id
                                JOIN Titles t ON h.Title_Id = t.Id
                                WHERE h.Realtime_Min > 0 
-                                 AND (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
                                GROUP BY a.Value, t.Value
                                ORDER BY MinutesPlayed DESC;";
 
