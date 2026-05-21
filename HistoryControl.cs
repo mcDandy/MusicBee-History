@@ -124,64 +124,84 @@ namespace MusicBeePlugin
             try
             {
                 string sql = @"
-WITH RAW_EVENTS AS (
+WITH BASE AS (
     SELECT
         h.ID,
         h.TIME,
-        tr.TITLE_ID,
-        tr.ARTIST_ID,
-        tr.ALBUM_ID,
+        h.TRACK_ID,
         a.VALUE  AS ARTIST,
         al.VALUE AS ALBUM,
         ti.VALUE AS TRACK,
-        h.PLAY_HEAD,
+
+        -- předchozí PLAY_HEAD pro stejný TRACK
+        COALESCE((
+            SELECT h2.PLAY_HEAD
+            FROM HISTORY h2
+            WHERE h2.TRACK_ID = h.TRACK_ID
+              AND h2.ID < h.ID
+            ORDER BY h2.ID DESC
+            LIMIT 1
+        ), 0) AS PREV_PLAY_HEAD,
+
+        (h.PLAY_HEAD) AS PLAY_HEAD,
         ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
         h.PITCH                            AS PITCH_SEMITONES,
-        ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
+        ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
+
+        -- DELTA počítáme pouze pokud předchozí záznam pro stejný track existuje a měl stav PLAYING (3)
+        CASE
+            WHEN EXISTS (
+                SELECT 1 FROM HISTORY h3
+                WHERE h3.TRACK_ID = h.TRACK_ID AND h3.ID < h.ID
+            )
+            AND (SELECT h2.PLAYER_STATE
+                 FROM HISTORY h2
+                 WHERE h2.TRACK_ID = h.TRACK_ID
+                   AND h2.ID < h.ID
+                 ORDER BY h2.ID DESC
+                 LIMIT 1) = 3
+            THEN
+                CASE
+                    WHEN (h.PLAY_HEAD - (SELECT h2.PLAY_HEAD
+                                         FROM HISTORY h2
+                                         WHERE h2.TRACK_ID = h.TRACK_ID
+                                           AND h2.ID < h.ID
+                                         ORDER BY h2.ID DESC
+                                         LIMIT 1)) > 0
+                    THEN (h.PLAY_HEAD - (SELECT h2.PLAY_HEAD
+                                         FROM HISTORY h2
+                                         WHERE h2.TRACK_ID = h.TRACK_ID
+                                           AND h2.ID < h.ID
+                                         ORDER BY h2.ID DESC
+                                         LIMIT 1))
+                    ELSE 0
+                END
+            ELSE 0
+        END AS DELTA_POS_MS
     FROM HISTORY h
     JOIN TRACKS tr ON tr.ID = h.TRACK_ID
     JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
     JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
     JOIN TITLES ti ON ti.ID = tr.TITLE_ID
-    WHERE h.EVENT_TYPE IN (1, 2, 16, 17, 48)
-),
-LAGGED_EVENTS AS (
-    SELECT *,
-           LAG(TITLE_ID) OVER (ORDER BY ID) AS PREV_TITLE_ID,
-           LAG(PLAY_HEAD) OVER (ORDER BY ID) AS PREV_PLAY_HEAD,
-           CASE 
-               WHEN LAG(TITLE_ID) OVER (ORDER BY ID) <> TITLE_ID 
-                 OR LAG(ARTIST_ID) OVER (ORDER BY ID) <> ARTIST_ID 
-                 OR LAG(ALBUM_ID) OVER (ORDER BY ID) <> ALBUM_ID THEN 1 
-               ELSE 0 
-           END AS IS_NEW_SESSION
-    FROM RAW_EVENTS
-),
-SESSIONS AS (
-    SELECT *,
-           SUM(IS_NEW_SESSION) OVER (ORDER BY ID) AS SESSION_ID
-    FROM LAGGED_EVENTS
+    WHERE (h.EVENT_TYPE = 16 OR (h.EVENT_TYPE = 2 AND h.PLAYER_STATE IN (6, 7)))
 ),
 CLEAN AS (
     SELECT
-        TIME, ARTIST, ALBUM, TRACK, SESSION_ID,
-        CASE
-            WHEN PREV_TITLE_ID = TITLE_ID AND PLAY_HEAD >= PREV_PLAY_HEAD THEN (PLAY_HEAD - PREV_PLAY_HEAD)
-            ELSE 0
-        END AS DELTA_POS_MS,
+        TIME, TRACK_ID, ARTIST, ALBUM, TRACK,
+        CASE WHEN DELTA_POS_MS > 0 THEN DELTA_POS_MS ELSE 0 END AS DELTA_POS_MS,
         SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
-    FROM SESSIONS
+    FROM BASE
 )
 SELECT
     datetime(MIN(TIME), 'unixepoch', 'localtime') AS TIME,
     ARTIST, ALBUM, TRACK,
     ROUND(SUM(DELTA_POS_MS) / 1000.0, 2) AS PLAYED_LENGTH_S,
-    ROUND(SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) / 1000.0, 2) AS PLAYED_REALTIME_S,
-    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SPEED_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SPEED_MULT,
-    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 0.0 ELSE SUM(DELTA_POS_MS * PITCH_SEMITONES) / (SUM(DELTA_POS_MS) * 1.0) END, 3) AS AVG_PITCH,
-    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
+    ROUND(SUM(DELTA_POS_MS * SPEED_MULT * SAMPLE_RATE_MULT) / 1000.0, 2) AS PLAYED_REALTIME_S,
+    ROUND(CASE WHEN SUM(DELTA_POS_MS)=0 THEN 1.0 ELSE SUM(DELTA_POS_MS*SPEED_MULT)/SUM(DELTA_POS_MS) END, 4) AS AVG_SPEED_MULT,
+    ROUND(CASE WHEN SUM(DELTA_POS_MS)=0 THEN 0.0 ELSE SUM(DELTA_POS_MS*PITCH_SEMITONES)/SUM(DELTA_POS_MS) END, 3) AS AVG_PITCH,
+    ROUND(CASE WHEN SUM(DELTA_POS_MS)=0 THEN 1.0 ELSE SUM(DELTA_POS_MS*SAMPLE_RATE_MULT)/SUM(DELTA_POS_MS) END, 4) AS AVG_SAMPLE_RATE_MULT
 FROM CLEAN
-GROUP BY SESSION_ID, ARTIST, ALBUM, TRACK
+GROUP BY TRACK_ID, ARTIST, ALBUM, TRACK, date(TIME, 'unixepoch', 'localtime')
 ORDER BY MIN(TIME) DESC;";
 
                 var table = new DataTable();
