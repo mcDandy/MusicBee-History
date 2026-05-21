@@ -38,13 +38,12 @@ namespace MusicBeePlugin
                                 SELECT 
                                     tr.Artist_Id, 
                                     CASE 
-                                        -- Sledujeme časovou osu interpreta napříč celou historií
                                         WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id 
                                              AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id) 
                                              AND (
-                                                (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
+                                                (h.Event_Type  in (16,48) OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
                                                 OR 
-                                                (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 16 OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
+                                                (LAG(h.Event_Type) OVER (ORDER BY h.Id) in (16,48) OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
                                              )
                                         THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
                                              / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
@@ -87,14 +86,12 @@ namespace MusicBeePlugin
                                        tr.Artist_Id, 
                                        tr.Title_Id,
                                        CASE 
-                                           -- Porovnáváme s absolutně předchozím řádkem v celé historii
                                            WHEN LAG(tr.Title_Id) OVER (ORDER BY h.Id) = tr.Title_Id 
                                                 AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)
-                                                -- Výpočet provedeme, pouze pokud aktuální NEBO předchozí řádek byl hrací event
                                                 AND (
-                                                   (h.Event_Type = 16 OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
+                                                   (h.Event_Type in (16,48) OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
                                                    OR 
-                                                   (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 16 OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
+                                                   (LAG(h.Event_Type) OVER (ORDER BY h.Id) in (16,48) OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
                                                 )
                                            THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
                                                 / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
@@ -150,7 +147,6 @@ WITH RAW_EVENTS AS (
     LEFT JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
     LEFT JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
     LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
-    -- zahrneme běžné play/pause/track eventy a všechny záznamy kde je Player_State=3 (playing)
     WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
 ),
 
