@@ -23,7 +23,8 @@ namespace MusicBeePlugin
         {
             if (new NotificationType[] {
                 NotificationType.PlayStateChanged, NotificationType.TrackChanged, NotificationType.TrackChanging, NotificationType.PluginStartup,
-                NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged, NotificationType.AutoDjStarted,NotificationType.AutoDjStopped
+                NotificationType.ShutdownStarted, NotificationType.TempoSetOrChanged, NotificationType.AutoDjStarted,NotificationType.AutoDjStopped,
+                NotificationType.PlayerShuffleChanged, NotificationType.PlayerRepeatChanged, NotificationType.VolumeMuteChanged, NotificationType.VolumeLevelChanged
             }.Contains(event_type))
             {
                 if (event_type == NotificationType.TempoSetOrChanged)
@@ -34,6 +35,11 @@ namespace MusicBeePlugin
                     lastSampleRate = int.Parse(urlParts[2]);
                     sourceFileUrl = mbApiInterface.NowPlaying_GetFileUrl();
                 }
+                if (new NotificationType[] { NotificationType.PlayerShuffleChanged, NotificationType.PlayerRepeatChanged }.Contains(event_type))
+                {
+                    MessageBox.Show($"Event: {event_type}\nValue: {sourceFileUrl}");
+                    sourceFileUrl = mbApiInterface.NowPlaying_GetFileUrl();
+                }
                 PlayState state = mbApiInterface.Player_GetPlayState();
                 int played = mbApiInterface.Player_GetPosition();
                 int length = mbApiInterface.NowPlaying_GetDuration();
@@ -41,10 +47,15 @@ namespace MusicBeePlugin
                 string album = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Album);
                 string title = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.TrackTitle);
                 string genre = mbApiInterface.NowPlaying_GetFileTag(MetaDataType.Genre);
+                bool autoDjEnabled = mbApiInterface.Player_GetAutoDjEnabled();
+                RepeatMode repeatMode = mbApiInterface.Player_GetRepeat();
+                bool shuffleMode = mbApiInterface.Player_GetShuffle();
+                float volumeLevel = mbApiInterface.Player_GetVolume();
+                bool volumeMute = mbApiInterface.Player_GetMute();
 
                 if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Playing) || (played == 0 && state == PlayState.Stopped && lastState == PlayState.Playing))
                 {
-                    played = lastHeadPos + (int)((DateTime.UtcNow - lastEventTime).TotalMilliseconds*((lastSpeed+100)/100.0 * (lastSampleRate+100)/100.0));
+                    played = lastHeadPos + (int)((DateTime.UtcNow - lastEventTime).TotalMilliseconds * ((lastSpeed + 100) / 100.0 * (lastSampleRate + 100) / 100.0));
                 }
                 else if ((played == 0 && event_type == NotificationType.TrackChanging && lastState == PlayState.Paused) || (played == 0 && state == PlayState.Stopped && lastState == PlayState.Paused))
                 {
@@ -70,22 +81,26 @@ namespace MusicBeePlugin
                         int? urli = GetOrCreateUrlId(conn, sourceFileUrl);
                         CreateStateIfNotExists(conn, state);
                         Createevent_typeIfNotExists(conn, event_type);
-
+                        CreateRepeatModeIfNotExists(conn, repeatMode);
 
                         using (SQLiteCommand cmd = conn.CreateCommand())
                         {
                             int? trackId = GetOrCreateTrackId(conn, aid, alid, tid, gid, urli, length);
-                            cmd.CommandText =@"INSERT INTO HISTORY 
-                                                (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAYED, TIME, SPEED, PITCH, SAMPLE_RATE) 
+                            cmd.CommandText = @"INSERT INTO HISTORY 
+                                                (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAY_HEAD, TIME, SPEED, PITCH, SAMPLE_RATE, VOLUME_LEVEL, VOLUME_MUTE, REPEAT_MODE, SHUFFLE_MODE) 
                                                 VALUES 
-                                                (@track_id, @player_state, @event_type, @played, @Time, @speed, @pitch, @sample_rate);";
+                                                (@track_id, @player_state, @event_type, @play_head, @Time, @speed, @pitch, @sample_rate, @volume_level, @volume_mute, @repeat_mode, @shuffle_mode);";
                             cmd.Parameters.AddWithValue("@track_id", trackId);
                             cmd.Parameters.AddWithValue("@player_state", (int)state);
                             cmd.Parameters.AddWithValue("@event_type", (int)event_type);
+                            cmd.Parameters.AddWithValue("@repeat_mode", repeatMode);
+                            cmd.Parameters.AddWithValue("@shuffle_mode", shuffleMode);
+                            cmd.Parameters.AddWithValue("@volume_level", volumeLevel);
+                            cmd.Parameters.AddWithValue("@volume_mute", volumeMute);
                             cmd.Parameters.AddWithValue("@speed", lastSpeed);
                             cmd.Parameters.AddWithValue("@pitch", lastPitch);
                             cmd.Parameters.AddWithValue("@sample_rate", lastSampleRate);
-                            cmd.Parameters.AddWithValue("@played", played);
+                            cmd.Parameters.AddWithValue("@play_head", played);
                             cmd.Parameters.AddWithValue("@Time", (DateTime.UtcNow.Ticks - unixTicks) * 1.0d / TimeSpan.TicksPerSecond);
 
                             try
@@ -288,6 +303,33 @@ namespace MusicBeePlugin
                 }
                 else return null;
             }
+            int? CreateRepeatModeIfNotExists(SQLiteConnection conn, RepeatMode mode)
+            {
+                using (SQLiteCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT ID FROM REPEAT_MODES WHERE VALUE = @name";
+                    cmd.Parameters.AddWithValue("@name", mode.ToString());
+                    object result = cmd.ExecuteScalar();
+                    if (result != null)
+                        return Convert.ToInt32(result);
+                }
+                using (SQLiteCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "INSERT INTO REPEAT_MODES (ID,VALUE) VALUES (@id,@name);";
+                    cmd.Parameters.AddWithValue("@id", (int)mode);
+                    cmd.Parameters.AddWithValue("@name", mode.ToString());
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                        return (int)mode;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.ToString());
+                        return null;
+                    }
+                }
+            }
         }
 
         private void InitDatabase()
@@ -337,6 +379,11 @@ namespace MusicBeePlugin
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS REPEAT_MODES (
+                    ID INTEGER PRIMARY KEY,
+                    VALUE TEXT UNIQUE
+                )";
+                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TRACKS (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     TITLE_ID INTEGER,
@@ -357,19 +404,28 @@ namespace MusicBeePlugin
                     TRACK_ID INTEGER,
                     PLAYER_STATE INTEGER,
                     EVENT_TYPE INTEGER,
-                    PLAYED INTEGER,
+                    PLAY_HEAD INTEGER,
                     TIME REAL,
                     SPEED INTEGER,
                     PITCH REAL,
                     SAMPLE_RATE INTEGER,
+                    REPEAT_MODE INTEGER,
+                    SHUFFLE_MODE INTEGER,
+                    VOLUME_LEVEL REAL,
+                    VOLUME_MUTE INTEGER,
                     FOREIGN KEY(TRACK_ID) REFERENCES TRACKS(ID),
                     FOREIGN KEY(PLAYER_STATE) REFERENCES PLAYER_STATES(ID),
-                    FOREIGN KEY(EVENT_TYPE) REFERENCES EVENT_TYPES(ID)
+                    FOREIGN KEY(EVENT_TYPE) REFERENCES EVENT_TYPES(ID),
+                    FOREIGN KEY(REPEAT_MODE) REFERENCES REPEAT_MODES(ID)
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_track_id_lookup ON HISTORY (TRACK_ID, ID DESC, PLAYED);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_track_id_lookup ON HISTORY (TRACK_ID, ID DESC, PLAY_HEAD);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_events ON HISTORY(EVENT_TYPE, PLAYER_STATE);";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_lookup ON TRACKS(ARTIST_ID, ALBUM_ID, TITLE_ID, GENRE_ID, URL_ID);";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_volume_lookup ON HISTORY(VOLUME_LEVEL, VOLUME_MUTE);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
                 SELECT 
@@ -381,9 +437,9 @@ namespace MusicBeePlugin
                     g.Value AS Genre,
                     ps.Value AS Player_state,
                     et.Value AS Event_type,
-                    ROUND(h.Played / 1000.0, 2) AS Seconds_played,
+                    ROUND(h.Play_Head / 1000.0, 2) AS Seconds_played,
                     ROUND(tr.Length / 1000.0, 2) AS Lenght_of_media_s,
-                    ROUND((h.Played * 100.0) / tr.Length, 1) AS percent_played
+                    ROUND((h.Play_Head * 100.0) / tr.Length, 1) AS percent_played
                 FROM History h
                 LEFT JOIN TRACKS tr ON h.TRACK_ID = tr.ID
                 LEFT JOIN ARTISTS a ON tr.ARTIST_ID = a.ID

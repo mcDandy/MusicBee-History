@@ -39,8 +39,8 @@ namespace MusicBeePlugin
                                     tr.Artist_Id, 
                                     CASE 
                                         WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id 
-                                             AND h.Played >= LAG(h.Played) OVER (ORDER BY h.Id) 
-                                        THEN (h.Played - LAG(h.Played) OVER (ORDER BY h.Id)) 
+                                             AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id) 
+                                        THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
                                              / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) ) -- Správné dělení rychlostmi pro reálný čas
                                              / 60000.0 -- Převod z milisekund na minuty
                                         ELSE 0 
@@ -86,8 +86,8 @@ namespace MusicBeePlugin
                                        CASE 
                                            -- Počítáme deltu pouze pokud navazuje stejná skladba (podle stabilního Title_Id)
                                            WHEN LAG(tr.Title_Id) OVER (ORDER BY h.Id) = tr.Title_Id 
-                                                AND h.Played >= LAG(h.Played) OVER (ORDER BY h.Id) 
-                                           THEN (h.Played - LAG(h.Played) OVER (ORDER BY h.Id)) 
+                                                AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id) 
+                                           THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
                                                 / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) ) -- Dělení oběma násobiči pro reálný čas
                                                 / 60000.0 -- Převod z milisekund na minuty
                                            ELSE 0 
@@ -134,7 +134,7 @@ WITH RAW_EVENTS AS (
         a.VALUE  AS ARTIST,
         al.VALUE AS ALBUM,
         ti.VALUE AS TRACK,
-        h.PLAYED,
+        h.PLAY_HEAD,
         ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
         h.PITCH                            AS PITCH_SEMITONES,
         ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
@@ -148,7 +148,7 @@ WITH RAW_EVENTS AS (
 LAGGED_EVENTS AS (
     SELECT *,
            LAG(TITLE_ID) OVER (ORDER BY ID) AS PREV_TITLE_ID,
-           LAG(PLAYED) OVER (ORDER BY ID) AS PREV_PLAYED,
+           LAG(PLAY_HEAD) OVER (ORDER BY ID) AS PREV_PLAY_HEAD,
            CASE 
                WHEN LAG(TITLE_ID) OVER (ORDER BY ID) <> TITLE_ID 
                  OR LAG(ARTIST_ID) OVER (ORDER BY ID) <> ARTIST_ID 
@@ -166,7 +166,7 @@ CLEAN AS (
     SELECT
         TIME, ARTIST, ALBUM, TRACK, SESSION_ID,
         CASE
-            WHEN PREV_TITLE_ID = TITLE_ID AND PLAYED >= PREV_PLAYED THEN (PLAYED - PREV_PLAYED)
+            WHEN PREV_TITLE_ID = TITLE_ID AND PLAY_HEAD >= PREV_PLAY_HEAD THEN (PLAY_HEAD - PREV_PLAY_HEAD)
             ELSE 0
         END AS DELTA_POS_MS,
         SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
