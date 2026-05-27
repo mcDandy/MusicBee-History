@@ -127,62 +127,62 @@ namespace MusicBeePlugin
             try
             {
                 string sql = @"
-WITH RAW_EVENTS AS (
-    SELECT
-        h.ID,
-        h.TIME,
-        tr.TITLE_ID,
-        tr.ARTIST_ID,
-        tr.ALBUM_ID,
-        a.VALUE  AS ARTIST,
-        al.VALUE AS ALBUM,
-        ti.VALUE AS TRACK,
-        h.PLAY_HEAD AS PLAYED,
-        h.PLAYER_STATE AS PLAYER_STATE,
-        ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
-        h.PITCH                            AS PITCH_SEMITONES,
-        ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
-    FROM HISTORY h
-    JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-    LEFT JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
-    LEFT JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
-    LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
-    WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
-),
-
-PARTITION_PREV AS (
-  SELECT *,
-    MAX(CASE WHEN PLAYER_STATE = 3 THEN PLAYED END) OVER (PARTITION BY TITLE_ID ORDER BY ID ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS PREV_PLAYED,
-    MAX(CASE WHEN PLAYER_STATE = 3 THEN TIME END) OVER (PARTITION BY TITLE_ID ORDER BY ID ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS PREV_TIME
-      FROM RAW_EVENTS
-  ),
-
-  CLEAN AS (
-    SELECT
-        TIME, ARTIST, ALBUM, TRACK,
-        CASE
-            WHEN PREV_PLAYED IS NULL THEN 0
-            WHEN PLAYED <= PREV_PLAYED THEN 0
-            WHEN PREV_TIME IS NULL THEN 0
-            WHEN (PLAYED - PREV_PLAYED) > ((TIME - PREV_TIME) * 1000.0 * 3.0 * (CASE WHEN SPEED_MULT < 1.0 THEN 1.0 ELSE SPEED_MULT END) * (CASE WHEN SAMPLE_RATE_MULT < 1.0 THEN 1.0 ELSE SAMPLE_RATE_MULT END)) THEN 0
-            ELSE (PLAYED - PREV_PLAYED)
-        END AS DELTA_POS_MS,
-        SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
-    FROM PARTITION_PREV
-)
-
-SELECT
-    datetime(MIN(CASE WHEN DELTA_POS_MS>0 THEN TIME END), 'unixepoch','localtime') AS TIME,
-    ARTIST, ALBUM, TRACK,
-    ROUND(SUM(DELTA_POS_MS) / 1000.0, 2) AS PLAYED_LENGTH_S,
-    ROUND(SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) / 1000.0, 2) AS PLAYED_REALTIME_S,
-    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SPEED_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SPEED_MULT,
-    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 0.0 ELSE SUM(DELTA_POS_MS * PITCH_SEMITONES) / (SUM(DELTA_POS_MS) * 1.0) END, 3) AS AVG_PITCH,
-    ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
-FROM CLEAN
-GROUP BY ARTIST, ALBUM, TRACK
-HAVING SUM(DELTA_POS_MS) > 0
-ORDER BY MIN(CASE WHEN DELTA_POS_MS>0 THEN TIME END) DESC;";
+                    WITH RAW_EVENTS AS (
+                        SELECT
+                            h.ID,
+                            h.TIME,
+                            tr.TITLE_ID,
+                            tr.ARTIST_ID,
+                            tr.ALBUM_ID,
+                            a.VALUE  AS ARTIST,
+                            al.VALUE AS ALBUM,
+                            ti.VALUE AS TRACK,
+                            h.PLAY_HEAD AS PLAYED,
+                            h.PLAYER_STATE AS PLAYER_STATE,
+                            ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
+                            h.PITCH                            AS PITCH_SEMITONES,
+                            ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
+                        FROM HISTORY h
+                        JOIN TRACKS tr ON tr.ID = h.TRACK_ID
+                        LEFT JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
+                        LEFT JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
+                        LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
+                        WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
+                    ),
+                    
+                    PARTITION_PREV AS (
+                      SELECT *,
+                        MAX(CASE WHEN PLAYER_STATE = 3 THEN PLAYED END) OVER (PARTITION BY TITLE_ID ORDER BY ID ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS PREV_PLAYED,
+                        MAX(CASE WHEN PLAYER_STATE = 3 THEN TIME END) OVER (PARTITION BY TITLE_ID ORDER BY ID ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS PREV_TIME
+                          FROM RAW_EVENTS
+                      ),
+                    
+                      CLEAN AS (
+                        SELECT
+                            TIME, ARTIST, ALBUM, TRACK,
+                            CASE
+                                WHEN PREV_PLAYED IS NULL THEN 0
+                                WHEN PLAYED <= PREV_PLAYED THEN 0
+                                WHEN PREV_TIME IS NULL THEN 0
+                                WHEN (PLAYED - PREV_PLAYED) > ((TIME - PREV_TIME) * 1000.0 * 3.0 * (CASE WHEN SPEED_MULT < 1.0 THEN 1.0 ELSE SPEED_MULT END) * (CASE WHEN SAMPLE_RATE_MULT < 1.0 THEN 1.0 ELSE SAMPLE_RATE_MULT END)) THEN 0
+                                ELSE (PLAYED - PREV_PLAYED)
+                            END AS DELTA_POS_MS,
+                            SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
+                        FROM PARTITION_PREV
+                    )
+                    
+                    SELECT
+                        datetime(MIN(CASE WHEN DELTA_POS_MS>0 THEN TIME END), 'unixepoch','localtime') AS TIME,
+                        ARTIST, ALBUM, TRACK,
+                        ROUND(SUM(DELTA_POS_MS) / 1000.0, 2) AS PLAYED_LENGTH_S,
+                        ROUND(SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) / 1000.0, 2) AS PLAYED_REALTIME_S,
+                        ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SPEED_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SPEED_MULT,
+                        ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 0.0 ELSE SUM(DELTA_POS_MS * PITCH_SEMITONES) / (SUM(DELTA_POS_MS) * 1.0) END, 3) AS AVG_PITCH,
+                        ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
+                    FROM CLEAN
+                    GROUP BY ARTIST, ALBUM, TRACK
+                    HAVING SUM(DELTA_POS_MS) > 0
+                    ORDER BY MIN(CASE WHEN DELTA_POS_MS>0 THEN TIME END) DESC;";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
