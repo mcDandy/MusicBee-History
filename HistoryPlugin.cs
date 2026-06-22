@@ -37,7 +37,6 @@ namespace MusicBeePlugin
                 }
                 if (new NotificationType[] { NotificationType.PlayerShuffleChanged, NotificationType.PlayerRepeatChanged }.Contains(event_type))
                 {
-                    MessageBox.Show($"Event: {event_type}\nValue: {sourceFileUrl}");
                     sourceFileUrl = mbApiInterface.NowPlaying_GetFileUrl();
                 }
                 PlayState state = mbApiInterface.Player_GetPlayState();
