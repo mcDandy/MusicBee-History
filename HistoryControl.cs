@@ -135,11 +135,18 @@ namespace MusicBeePlugin
                             tr.TITLE_ID,
                             tr.ARTIST_ID,
                             tr.ALBUM_ID,
+                            tr.GENRE_ID,
+                            IFNULL(tr.ARTIST_ID, -1) || ':' ||
+                            IFNULL(tr.ALBUM_ID, -1) || ':' ||
+                            IFNULL(tr.TITLE_ID, -1) || ':' ||
+                            IFNULL(tr.GENRE_ID, -1) || ':' ||
+                            IFNULL(ROUND(tr.LENGTH / 1000.0), -1) AS LOGICAL_TRACK_KEY,
                             a.VALUE  AS ARTIST,
                             al.VALUE AS ALBUM,
                             ti.VALUE AS TRACK,
                             h.PLAY_HEAD AS PLAYED,
                             h.PLAYER_STATE AS PLAYER_STATE,
+                            h.EVENT_TYPE AS EVENT_TYPE,
                             ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
                             h.PITCH                            AS PITCH_SEMITONES,
                             ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
@@ -153,7 +160,7 @@ namespace MusicBeePlugin
                     
                     ORDERED_EVENTS AS (
                       SELECT *,
-                        LAG(TRACK_ID) OVER (ORDER BY ID) AS PREV_TRACK_ID,
+                        LAG(LOGICAL_TRACK_KEY) OVER (ORDER BY ID) AS PREV_LOGICAL_TRACK_KEY,
                         LAG(PLAYED) OVER (ORDER BY ID) AS PREV_PLAYED,
                         LAG(TIME) OVER (ORDER BY ID) AS PREV_TIME
                           FROM RAW_EVENTS
@@ -163,8 +170,9 @@ namespace MusicBeePlugin
                       SELECT *,
                         SUM(
                             CASE
-                                WHEN PREV_TRACK_ID IS NULL THEN 1
-                                WHEN PREV_TRACK_ID <> TRACK_ID THEN 1
+                                WHEN PREV_LOGICAL_TRACK_KEY IS NULL THEN 1
+                                WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 1
+                                WHEN EVENT_TYPE = 1 AND PLAYED < PREV_PLAYED THEN 1
                                 ELSE 0
                             END
                         ) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
@@ -175,7 +183,7 @@ namespace MusicBeePlugin
                         SELECT
                             SESSION_ID, TIME, ARTIST, ALBUM, TRACK,
                             CASE
-                                WHEN PREV_TRACK_ID <> TRACK_ID THEN 0
+                                WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 0
                                 WHEN PREV_PLAYED IS NULL THEN 0
                                 WHEN PLAYED <= PREV_PLAYED THEN 0
                                 WHEN PREV_TIME IS NULL THEN 0
