@@ -157,7 +157,7 @@ namespace MusicBeePlugin
                         LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
                         WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
                     ),
-                    
+
                     ORDERED_EVENTS AS (
                       SELECT *,
                         LAG(LOGICAL_TRACK_KEY) OVER (ORDER BY ID) AS PREV_LOGICAL_TRACK_KEY,
@@ -178,7 +178,7 @@ namespace MusicBeePlugin
                         ) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
                           FROM ORDERED_EVENTS
                       ),
-                    
+
                       CLEAN AS (
                         SELECT
                             SESSION_ID, TIME, ARTIST, ALBUM, TRACK,
@@ -193,7 +193,7 @@ namespace MusicBeePlugin
                             SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
                         FROM EVENT_DELTAS
                     )
-                    
+
                     SELECT
                         datetime(MAX(CASE WHEN DELTA_POS_MS>0 THEN TIME END), 'unixepoch','localtime') AS TIME,
                         ARTIST, ALBUM, TRACK,

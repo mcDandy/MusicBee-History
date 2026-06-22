@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Drawing;
 using System.Windows.Forms;
@@ -23,7 +23,7 @@ namespace MusicBeePlugin
                 about.Name = "Another History Plugin";
                 about.Description = "A history plugin for MusicBee. Sees everything that happens in the playhead.";
                 about.Author = "mkDaniel";
-                about.TargetApplication = "";   //  the name of a Plugin Storage device or panel header for a dockable panel
+                about.TargetApplication = "Historyy";   //  the name of a Plugin Storage device or panel header for a dockable panel
                 about.Type = PluginType.General;
                 about.VersionMajor = 1;  // your plugin version
                 about.VersionMinor = 0;
