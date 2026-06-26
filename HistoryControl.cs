@@ -29,7 +29,7 @@ namespace MusicBeePlugin
 
         private void LoadArtistTimeGrid()
         {
-            float minTime = (float)(DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60);
+            float minTime = DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
             try
             {
                 var sql = @"WITH FILTERED_HISTORY AS (
@@ -103,7 +103,7 @@ namespace MusicBeePlugin
         }
         private void LoadTopSongsGrid()
         {
-            float minTime = (float)(DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60);
+            float minTime = DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
             try
             {
                 string sql = @"WITH FILTERED_HISTORY AS (
@@ -179,7 +179,7 @@ namespace MusicBeePlugin
         }
         private void LoadHistoryGrid()
         {
-            float minTime = (float)(DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60);
+            float minTime = DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
             try
             {
                 string sql = @"WITH FILTERED_HISTORY AS (
@@ -274,6 +274,8 @@ namespace MusicBeePlugin
                         adapter.Fill(table);
                     }
                 }
+                dataGridView2.AutoGenerateColumns = true;
+                dataGridView2.DataSource = table;
             }
             catch (Exception ex)
             {
