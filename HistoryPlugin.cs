@@ -349,6 +349,7 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_artists_value ON ARTISTS (VALUE);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS ALBUMS (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
@@ -356,6 +357,7 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_albums_value ON ALBUMS (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TITLES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
@@ -363,6 +365,7 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_titles_value ON TITLES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS GENRES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
@@ -370,12 +373,15 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_genres_value ON GENRES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS PLAYER_STATES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
+                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_player_states_value ON PLAYER_STATES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS EVENT_TYPES (
                     ID INTEGER PRIMARY KEY,
                     VALUE TEXT UNIQUE
@@ -383,11 +389,13 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_event_types_value ON EVENT_TYPES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS URLS (
                     ID INTEGER PRIMARY KEY,
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS REPEAT_MODES (
                     ID INTEGER PRIMARY KEY,
                     VALUE TEXT UNIQUE
@@ -395,6 +403,7 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_repeat_modes_value ON REPEAT_MODES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TRACKS (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     TITLE_ID INTEGER,
@@ -410,6 +419,9 @@ namespace MusicBeePlugin
                     FOREIGN KEY(URL_ID) REFERENCES URLS(ID)
                 )";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_covering ON TRACKS (ID, TITLE_ID, ARTIST_ID, ALBUM_ID, GENRE_ID, LENGTH);";
+                command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS HISTORY (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     TRACK_ID INTEGER,
@@ -430,36 +442,42 @@ namespace MusicBeePlugin
                     FOREIGN KEY(REPEAT_MODE) REFERENCES REPEAT_MODES(ID)
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @" CREATE INDEX IF NOT EXISTS idx_history_composite ON HISTORY (ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID);";
+
+
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_id_covering
+                                ON HISTORY (ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID, TIME, PLAY_HEAD, SPEED, PITCH, SAMPLE_RATE);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_covering ON TRACKS (ID, TITLE_ID, ARTIST_ID, ALBUM_ID, GENRE_ID, LENGTH);";
+
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_time_events
+                                ON HISTORY (TIME DESC, EVENT_TYPE, ID ASC, TRACK_ID, PLAY_HEAD, SPEED, PITCH, SAMPLE_RATE);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_ordered_covering ON HISTORY(ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID, TIME, PLAY_HEAD, SPEED, PITCH, SAMPLE_RATE);";
+
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_time_states
+                                ON HISTORY (TIME DESC, PLAYER_STATE, ID ASC, TRACK_ID, PLAY_HEAD, SPEED, PITCH, SAMPLE_RATE);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_perf_io ON HISTORY (ID ASC, TRACK_ID, PLAY_HEAD, TIME, EVENT_TYPE, PLAYER_STATE);";
-                command.ExecuteNonQuery();
+
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
-                SELECT
-                    h.Id,
-                    datetime(h.Time, 'unixepoch', 'localtime') AS Event_time,
-                    a.Value AS Artist,
-                    ti.Value AS Title,
-                    al.Value AS Album,
-                    g.Value AS Genre,
-                    ps.Value AS Player_state,
-                    et.Value AS Event_type,
-                    ROUND(h.Play_Head / 1000.0, 2) AS Seconds_played,
-                    ROUND(tr.Length / 1000.0, 2) AS Lenght_of_media_s,
-                    ROUND((h.Play_Head * 100.0) / tr.Length, 1) AS percent_played
-                FROM History h
-                LEFT JOIN TRACKS tr ON h.TRACK_ID = tr.ID
-                LEFT JOIN ARTISTS a ON tr.ARTIST_ID = a.ID
-                LEFT JOIN TITLES ti ON tr.TITLE_ID = ti.ID
-                LEFT JOIN ALBUMS al ON tr.ALBUM_ID = al.ID
-                LEFT JOIN GENRES g ON tr.GENRE_ID = g.ID
-                LEFT JOIN PLAYER_STATES ps ON h.PLAYER_STATE = ps.ID
-                LEFT JOIN EVENT_TYPES et ON h.EVENT_TYPE = et.ID
-                ORDER BY h.Time DESC;";
+                     SELECT
+                         h.Id,
+                         datetime(h.Time, 'unixepoch', 'localtime') AS Event_time,
+                         a.Value AS Artist,
+                         ti.Value AS Title,
+                         al.Value AS Album,
+                         g.Value AS Genre,
+                         ps.Value AS Player_state,
+                         et.Value AS Event_type,
+                         ROUND(h.Play_Head / 1000.0, 2) AS Seconds_played,
+                         ROUND(tr.Length / 1000.0, 2) AS Lenght_of_media_s,
+                         ROUND((h.Play_Head * 100.0) / tr.Length, 1) AS percent_played
+                     FROM History h
+                     LEFT JOIN TRACKS tr ON h.TRACK_ID = tr.ID
+                     LEFT JOIN ARTISTS a ON tr.ARTIST_ID = a.ID
+                     LEFT JOIN TITLES ti ON tr.TITLE_ID = ti.ID
+                     LEFT JOIN ALBUMS al ON tr.ALBUM_ID = al.ID
+                     LEFT JOIN GENRES g ON tr.GENRE_ID = g.ID
+                     LEFT JOIN PLAYER_STATES ps ON h.PLAYER_STATE = ps.ID
+                     LEFT JOIN EVENT_TYPES et ON h.EVENT_TYPE = et.ID
+                     ORDER BY h.Time DESC;";
                 command.ExecuteNonQuery();
             }
         }

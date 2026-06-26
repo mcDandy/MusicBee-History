@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
 
 namespace MusicBeePlugin
 {
@@ -36,7 +35,8 @@ namespace MusicBeePlugin
             }
             public MusicBeeVersion MusicBeeVersion
             {
-                get {
+                get
+                {
                     if (ApiRevision <= 25)
                         return MusicBeeVersion.v2_0;
                     else if (ApiRevision <= 31)
@@ -358,9 +358,9 @@ namespace MusicBeePlugin
             MusicBeeStarted = 34,
             PlayingTracksChanged = 35,
             PlayingTracksQueueChanged = 36,
-			PlaylistCreated = 37,
-			PlaylistUpdated = 38,
-			PlaylistDeleted = 39,
+            PlaylistCreated = 37,
+            PlaylistUpdated = 38,
+            PlaylistDeleted = 39,
             TempoSetOrChanged = 48
         }
 
@@ -419,7 +419,7 @@ namespace MusicBeePlugin
             AlbumArtistRaw = 34,     // stored album artist
             Artist = 32,             // displayed artist
             MultiArtist = 33,        // individual artists, separated by a null char
-			PrimaryArtist = 19,      // first artist from multi-artist tagged file, otherwise displayed artist
+            PrimaryArtist = 19,      // first artist from multi-artist tagged file, otherwise displayed artist
             Artists = 144,
             ArtistsWithArtistRole = 145,
             ArtistsWithPerformerRole = 146,
@@ -557,9 +557,9 @@ namespace MusicBeePlugin
             AppleDevice = 2,
             GooglePlay2 = 3,
             AppleDevice2 = 4,
-			WebDrivePluginOneDrive = 5,
-			WebDrivePluginGoogleDrive = 6,
-			WebDrivePluginDropBox = 7
+            WebDrivePluginOneDrive = 5,
+            WebDrivePluginGoogleDrive = 6,
+            WebDrivePluginDropBox = 7
         }
 
         public enum DataType
@@ -732,7 +732,7 @@ namespace MusicBeePlugin
         }
 
         [Flags()]
-        public enum PictureLocations: byte
+        public enum PictureLocations : byte
         {
             None = 0,
             EmbedInFile = 1,
