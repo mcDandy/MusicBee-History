@@ -270,8 +270,8 @@ namespace MusicBeePlugin
                         adapter.Fill(table);
                     }
                 }
-                dataGridView2.AutoGenerateColumns = true;
-                dataGridView2.DataSource = table;
+                dataGridView3.AutoGenerateColumns = true;
+                dataGridView3.DataSource = table;
             }
             catch (Exception ex)
             {
