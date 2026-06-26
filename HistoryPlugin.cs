@@ -3,7 +3,6 @@ using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using MusicBeePlugin;
 
 namespace MusicBeePlugin
 {
@@ -355,31 +354,34 @@ namespace MusicBeePlugin
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_albums_value ON ALBUMS (VALUE);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_albums_value ON ALBUMS (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TITLES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_titles_value ON TITLES (VALUE);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_titles_value ON TITLES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS GENRES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_genres_value ON GENRES (VALUE);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_genres_value ON GENRES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS PLAYER_STATES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_player_states_value ON PLAYER_STATES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS EVENT_TYPES (
                     ID INTEGER PRIMARY KEY,
                     VALUE TEXT UNIQUE
                 )";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_event_types_value ON EVENT_TYPES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS URLS (
                     ID INTEGER PRIMARY KEY,
@@ -390,6 +392,8 @@ namespace MusicBeePlugin
                     ID INTEGER PRIMARY KEY,
                     VALUE TEXT UNIQUE
                 )";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_repeat_modes_value ON REPEAT_MODES (VALUE, ID ASC);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TRACKS (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -434,8 +438,12 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_covering ON TRACKS (ID, TITLE_ID, ARTIST_ID, ALBUM_ID, GENRE_ID, LENGTH);";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_ordered_covering ON HISTORY(ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID, TIME, PLAY_HEAD, SPEED, PITCH, SAMPLE_RATE);";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_perf_io ON HISTORY (ID ASC, TRACK_ID, PLAY_HEAD, TIME, EVENT_TYPE, PLAYER_STATE);";
+                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
-                SELECT 
+                SELECT
                     h.Id,
                     datetime(h.Time, 'unixepoch', 'localtime') AS Event_time,
                     a.Value AS Artist,

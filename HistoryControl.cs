@@ -126,86 +126,73 @@ namespace MusicBeePlugin
         {
             try
             {
-                string sql = @"
-                    WITH RAW_EVENTS AS (
-                        SELECT
-                            h.ID,
-                            h.TIME,
-                            h.TRACK_ID,
-                            tr.TITLE_ID,
-                            tr.ARTIST_ID,
-                            tr.ALBUM_ID,
-                            tr.GENRE_ID,
-                            IFNULL(tr.ARTIST_ID, -1) || ':' ||
-                            IFNULL(tr.ALBUM_ID, -1) || ':' ||
-                            IFNULL(tr.TITLE_ID, -1) || ':' ||
-                            IFNULL(tr.GENRE_ID, -1) || ':' ||
-                            IFNULL(ROUND(tr.LENGTH / 1000.0), -1) AS LOGICAL_TRACK_KEY,
-                            a.VALUE  AS ARTIST,
-                            al.VALUE AS ALBUM,
-                            ti.VALUE AS TRACK,
-                            h.PLAY_HEAD AS PLAYED,
-                            h.PLAYER_STATE AS PLAYER_STATE,
-                            h.EVENT_TYPE AS EVENT_TYPE,
-                            ((100.0 + h.SPEED) / 100.0)       AS SPEED_MULT,
-                            h.PITCH                            AS PITCH_SEMITONES,
-                            ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
-                        FROM HISTORY h
-                        JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                        LEFT JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
-                        LEFT JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
-                        LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
-                        WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
-                    ),
-
-                    ORDERED_EVENTS AS (
-                      SELECT *,
-                        LAG(LOGICAL_TRACK_KEY) OVER (ORDER BY ID) AS PREV_LOGICAL_TRACK_KEY,
-                        LAG(PLAYED) OVER (ORDER BY ID) AS PREV_PLAYED,
-                        LAG(TIME) OVER (ORDER BY ID) AS PREV_TIME
-                          FROM RAW_EVENTS
-                      ),
-
-                    EVENT_DELTAS AS (
-                      SELECT *,
-                        SUM(
-                            CASE
-                                WHEN PREV_LOGICAL_TRACK_KEY IS NULL THEN 1
-                                WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 1
-                                WHEN EVENT_TYPE = 1 AND PLAYED < PREV_PLAYED THEN 1
-                                ELSE 0
-                            END
-                        ) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
-                          FROM ORDERED_EVENTS
-                      ),
-
-                      CLEAN AS (
-                        SELECT
-                            SESSION_ID, TIME, ARTIST, ALBUM, TRACK,
-                            CASE
-                                WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 0
-                                WHEN PREV_PLAYED IS NULL THEN 0
-                                WHEN PLAYED <= PREV_PLAYED THEN 0
-                                WHEN PREV_TIME IS NULL THEN 0
-                                WHEN (PLAYED - PREV_PLAYED) > ((TIME - PREV_TIME) * 1000.0 * 3.0 * (CASE WHEN SPEED_MULT < 1.0 THEN 1.0 ELSE SPEED_MULT END) * (CASE WHEN SAMPLE_RATE_MULT < 1.0 THEN 1.0 ELSE SAMPLE_RATE_MULT END)) THEN 0
-                                ELSE (PLAYED - PREV_PLAYED)
-                            END AS DELTA_POS_MS,
-                            SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
-                        FROM EVENT_DELTAS
-                    )
-
-                    SELECT
-                        datetime(MAX(CASE WHEN DELTA_POS_MS>0 THEN TIME END), 'unixepoch','localtime') AS TIME,
-                        ARTIST, ALBUM, TRACK,
-                        ROUND(SUM(DELTA_POS_MS) / 1000.0, 2) AS PLAYED_LENGTH_S,
-                        ROUND(SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) / 1000.0, 2) AS PLAYED_REALTIME_S,
-                        ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SPEED_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SPEED_MULT,
-                        ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 0.0 ELSE SUM(DELTA_POS_MS * PITCH_SEMITONES) / (SUM(DELTA_POS_MS) * 1.0) END, 3) AS AVG_PITCH,
-                        ROUND(CASE WHEN SUM(DELTA_POS_MS) = 0 THEN 1.0 ELSE SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) / (SUM(DELTA_POS_MS) * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
-                    FROM CLEAN
-                    GROUP BY SESSION_ID, ARTIST, ALBUM, TRACK
-                    HAVING SUM(DELTA_POS_MS) > 0
-                    ORDER BY MAX(CASE WHEN DELTA_POS_MS>0 THEN TIME END) DESC;";
+                string sql = @"WITH FILTERED_HISTORY AS (
+                                   SELECT
+                                       h.ID, h.TIME, h.TRACK_ID, h.PLAY_HEAD AS PLAYED, h.EVENT_TYPE, h.PLAYER_STATE,
+                                       ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT, h.PITCH AS PITCH_SEMITONES, ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
+                                   FROM HISTORY h
+                                   WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3) AND h.TIME > 0
+                               ),
+                               ORDERED_EVENTS AS (
+                                 SELECT fe.*,
+                                   tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH,
+                                   IFNULL(tr.ARTIST_ID, -1) || ':' || IFNULL(tr.ALBUM_ID, -1) || ':' || IFNULL(tr.TITLE_ID, -1) || ':' || IFNULL(tr.GENRE_ID, -1) || ':' || IFNULL(ROUND(tr.LENGTH / 1000.0), -1) AS LOGICAL_TRACK_KEY,
+                                   LAG(IFNULL(tr.ARTIST_ID, -1) || ':' || IFNULL(tr.ALBUM_ID, -1) || ':' || IFNULL(tr.TITLE_ID, -1) || ':' || IFNULL(tr.GENRE_ID, -1) || ':' || IFNULL(ROUND(tr.LENGTH / 1000.0), -1)) OVER (ORDER BY fe.ID) AS PREV_LOGICAL_TRACK_KEY,
+                                   LAG(fe.PLAYED) OVER (ORDER BY fe.ID) AS PREV_PLAYED,
+                                   LAG(fe.TIME) OVER (ORDER BY fe.ID) AS PREV_TIME
+                                 FROM FILTERED_HISTORY fe
+                                 JOIN TRACKS tr ON tr.ID = fe.TRACK_ID
+                               ),
+                               EVENT_DELTAS AS (
+                                 SELECT oe.*,
+                                   SUM(CASE
+                                           WHEN PREV_LOGICAL_TRACK_KEY IS NULL THEN 1
+                                           WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 1
+                                           WHEN EVENT_TYPE = 1 AND PLAYED < PREV_PLAYED THEN 1
+                                           ELSE 0
+                                       END) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
+                                 FROM ORDERED_EVENTS oe
+                               ),
+                               CLEAN AS (
+                                   SELECT ed.SESSION_ID, ed.TIME, ed.LOGICAL_TRACK_KEY, ed.TITLE_ID, ed.ARTIST_ID, ed.ALBUM_ID,
+                                       CASE
+                                           WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 0
+                                           WHEN PREV_PLAYED IS NULL THEN 0
+                                           WHEN PLAYED <= PREV_PLAYED THEN 0
+                                           WHEN PREV_TIME IS NULL THEN 0
+                                           WHEN (PLAYED - PREV_PLAYED) > ((TIME - PREV_TIME) * 1000.0 * 3.0 * (CASE WHEN SPEED_MULT < 1.0 THEN 1.0 ELSE SPEED_MULT END) * (CASE WHEN SAMPLE_RATE_MULT < 1.0 THEN 1.0 ELSE SAMPLE_RATE_MULT END)) THEN 0
+                                           ELSE (PLAYED - PREV_PLAYED)
+                                       END AS DELTA_POS_MS,
+                                       SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
+                                   FROM EVENT_DELTAS ed
+                               ),
+                               AGGREGATED AS (
+                                   SELECT
+                                       SESSION_ID, LOGICAL_TRACK_KEY, TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                       MAX(CASE WHEN DELTA_POS_MS > 0 THEN TIME END) AS MAX_TIME,
+                                       SUM(DELTA_POS_MS) AS SUM_DELTA,
+                                       SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) AS SUM_REALTIME,
+                                       SUM(DELTA_POS_MS * SPEED_MULT) AS SUM_SPEED_MULT,
+                                       SUM(DELTA_POS_MS * PITCH_SEMITONES) AS SUM_PITCH,
+                                       SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) AS SUM_SAMPLE_MULT
+                                   FROM CLEAN
+                                   GROUP BY SESSION_ID, LOGICAL_TRACK_KEY, TITLE_ID, ARTIST_ID, ALBUM_ID
+                                   HAVING SUM(DELTA_POS_MS) > 0
+                               )
+                               SELECT
+                                   datetime(agg.MAX_TIME, 'unixepoch','localtime') AS TIME,
+                                   a.VALUE AS ARTIST, al.VALUE AS ALBUM, ti.VALUE AS TRACK,
+                                   ROUND(agg.SUM_DELTA / 1000.0, 2) AS PLAYED_LENGTH_S,
+                                   ROUND(agg.SUM_REALTIME / 1000.0, 2) AS PLAYED_REALTIME_S,
+                                   ROUND(CASE WHEN agg.SUM_DELTA = 0 THEN 1.0 ELSE agg.SUM_SPEED_MULT / (agg.SUM_DELTA * 1.0) END, 4) AS AVG_SPEED_MULT,
+                                   ROUND(CASE WHEN agg.SUM_DELTA = 0 THEN 0.0 ELSE agg.SUM_PITCH / (agg.SUM_DELTA * 1.0) END, 3) AS AVG_PITCH,
+                                   ROUND(CASE WHEN agg.SUM_DELTA = 0 THEN 1.0 ELSE agg.SUM_SAMPLE_MULT / (agg.SUM_DELTA * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
+                               FROM AGGREGATED agg
+                               LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
+                               LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
+                               LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
+                               ORDER BY agg.MAX_TIME DESC;
+                               ";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
