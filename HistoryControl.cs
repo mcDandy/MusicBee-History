@@ -182,88 +182,97 @@ namespace MusicBeePlugin
             long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
             try
             {
-                string sql = @"WITH FILTERED_HISTORY AS (
-                                   SELECT
-                                       h.ID, h.TIME, h.TRACK_ID, h.PLAY_HEAD AS PLAYED, h.EVENT_TYPE, h.PLAYER_STATE,
-                                       ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT, h.PITCH AS PITCH_SEMITONES, ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
-                                       tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH
-                                   FROM HISTORY h
-                                   JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                                   WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3) AND h.TIME > @MinTime
-                               ),
-                               ORDERED_EVENTS AS (
-                                 SELECT fe.*,
-                                   LAG(fe.ARTIST_ID) OVER (ORDER BY fe.ID) AS PREV_ARTIST_ID,
-                                   LAG(fe.ALBUM_ID) OVER (ORDER BY fe.ID) AS PREV_ALBUM_ID,
-                                   LAG(fe.TITLE_ID) OVER (ORDER BY fe.ID) AS PREV_TITLE_ID,
-                                   LAG(fe.GENRE_ID) OVER (ORDER BY fe.ID) AS PREV_GENRE_ID,
-                                   LAG(fe.LENGTH) OVER (ORDER BY fe.ID) AS PREV_LENGTH,
+                string sql = @"
+        WITH BASE_HISTORY AS (
+            SELECT 
+                h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
+                ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
+                h.PITCH,
+                ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
+                tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH,
+                LAG(tr.TITLE_ID) OVER (ORDER BY h.ID) AS PREV_TITLE_ID,
+                LAG(tr.ARTIST_ID) OVER (ORDER BY h.ID) AS PREV_ARTIST_ID,
+                LAG(tr.ALBUM_ID) OVER (ORDER BY h.ID) AS PREV_ALBUM_ID,
+                LAG(h.EVENT_TYPE) OVER (ORDER BY h.ID) AS PREV_EVENT_TYPE,
+                LAG(h.PLAY_HEAD) OVER (ORDER BY h.ID) AS PREV_PLAY_HEAD,
+                LAG(h.TIME) OVER (ORDER BY h.ID) AS PREV_TIME
+            FROM HISTORY h
+            LEFT JOIN TRACKS tr ON tr.ID = h.TRACK_ID
+            -- Propustíme legitimní hudební eventy, stav Playing (3) i Shutdown (17)
+            WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
+              AND h.TIME > @MinTime
+        ),
+        SESSIONS AS (
+            SELECT *,
+                SUM(CASE
+                    -- Boundary: Úplně první řádek, který projde časovým filtrem @MinTime
+                    WHEN PREV_EVENT_TYPE IS NULL THEN 1
+                    
+                    -- Boundary: Restart MusicBee – předchozí zapsaný řádek byl Shutdown (17)
+                    -- Nový start po zapnutí přehrávače MUSÍ začít novou, čistou session
+                    WHEN PREV_EVENT_TYPE = 17 THEN 1
+                    
+                    -- Boundary: Změna metadat skladeb (null-safe)
+                    WHEN PREV_TITLE_ID IS NOT NULL AND TITLE_ID IS NOT NULL AND (
+                         TITLE_ID  IS NOT PREV_TITLE_ID OR 
+                         ARTIST_ID IS NOT PREV_ARTIST_ID OR 
+                         ALBUM_ID  IS NOT PREV_ALBUM_ID) THEN 1
+                         
+                    -- Boundary: Jakýkoliv propad PLAY_HEAD (přetočení skladby zpět)
+                    WHEN PLAY_HEAD < PREV_PLAY_HEAD THEN 1
+                    ELSE 0
+                END) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
+            FROM BASE_HISTORY
+        ),
+        ORDERED_SESSIONS AS (
+            SELECT *,
+                LAG(SESSION_ID) OVER (ORDER BY ID) AS PREV_SESSION_ID
+            FROM SESSIONS
+        ),
+        CLEANED_DELTAS AS (
+            SELECT
+                SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, PITCH, SAMPLE_RATE_MULT,
+                CASE
+                    -- Pokud začíná nová session, delta je 0
+                    WHEN PREV_SESSION_ID IS NOT SESSION_ID THEN 0
+                    WHEN TITLE_ID IS NULL THEN 0
+                    WHEN PREV_PLAY_HEAD IS NULL OR PLAY_HEAD <= PREV_PLAY_HEAD THEN 0
+                    -- Kontrola proti časovým anomáliím v DB
+                    WHEN (PLAY_HEAD - PREV_PLAY_HEAD) > ((TIME - PREV_TIME) * 3000.0 * MAX(1.0, SPEED_MULT) * MAX(1.0, SAMPLE_RATE_MULT)) THEN 0
+                    -- Pro řádek 17 (Shutdown) se normálně spočítá legitimní delta odehraného času před vypnutím
+                    ELSE (PLAY_HEAD - PREV_PLAY_HEAD)
+                END AS DELTA_POS_MS
+            FROM ORDERED_SESSIONS
+        ),
+        AGGREGATED AS (
+            SELECT
+                TITLE_ID, ARTIST_ID, ALBUM_ID,
+                MAX(TIME) AS MAX_TIME,
+                SUM(DELTA_POS_MS) AS SUM_DELTA,
+                SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) AS SUM_REALTIME,
+                SUM(DELTA_POS_MS * SPEED_MULT) AS SUM_SPEED_MULT,
+                SUM(DELTA_POS_MS * PITCH) AS SUM_PITCH,
+                SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) AS SUM_SAMPLE_MULT
+            FROM CLEANED_DELTAS
+            GROUP BY SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID
+            HAVING SUM(DELTA_POS_MS) > 0
+        )
+        SELECT
+            datetime(agg.MAX_TIME, 'unixepoch', 'localtime') AS TIME,
+            a.VALUE AS ARTIST,
+            al.VALUE AS ALBUM,
+            ti.VALUE AS TRACK,
+            ROUND(agg.SUM_DELTA / 1000.0, 2) AS PLAYED_LENGTH_S,
+            ROUND(agg.SUM_REALTIME / 1000.0, 2) AS PLAYED_REALTIME_S,
+            ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 4) AS AVG_SPEED_MULT,
+            ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 3) AS AVG_PITCH,
+            ROUND(agg.SUM_SAMPLE_MULT / agg.SUM_DELTA, 4) AS AVG_SAMPLE_RATE_MULT
+        FROM AGGREGATED agg
+        LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
+        LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
+        LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
+        ORDER BY agg.MAX_TIME DESC;";
 
-                                   LAG(fe.PLAYED) OVER (ORDER BY fe.ID) AS PREV_PLAYED,
-                                   LAG(fe.TIME) OVER (ORDER BY fe.ID) AS PREV_TIME
-                                 FROM FILTERED_HISTORY fe
-                               ),
-                               EVENT_DELTAS AS (
-                                 SELECT oe.*,
-                                   SUM(CASE
-                                           WHEN PREV_TITLE_ID IS NULL THEN 1
-                                           WHEN IFNULL(PREV_ARTIST_ID, -1) != IFNULL(ARTIST_ID, -1) OR
-                                                IFNULL(PREV_ALBUM_ID, -1)  != IFNULL(ALBUM_ID, -1)  OR
-                                                IFNULL(PREV_TITLE_ID, -1)  != IFNULL(TITLE_ID, -1)  OR
-                                                IFNULL(PREV_GENRE_ID, -1)  != IFNULL(GENRE_ID, -1)  OR
-                                                IFNULL(PREV_LENGTH, -1)    != IFNULL(LENGTH, -1)    THEN 1
-                                           WHEN EVENT_TYPE = 1 AND PLAYED < PREV_PLAYED THEN 1
-                                           ELSE 0
-                                       END) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
-                                 FROM ORDERED_EVENTS oe
-                               ),
-                               ORDERED_DELTAS AS (
-                                 SELECT ed.*,
-                                   -- Vytáhneme si SESSION_ID předchozího řádku pro bezpečné určení startu nové skladby
-                                   LAG(ed.SESSION_ID) OVER (ORDER BY ed.ID) AS PREV_SESSION_ID
-                                 FROM EVENT_DELTAS ed
-                               ),
-                               CLEAN AS (
-                                   SELECT od.SESSION_ID, od.TIME, od.TITLE_ID, od.ARTIST_ID, od.ALBUM_ID,
-                                       CASE
-                                           -- Pokud se liší SESSION_ID, jsme na prvním řádku nové skladby -> delta je 0
-                                           WHEN PREV_SESSION_ID IS NOT NULL AND PREV_SESSION_ID != SESSION_ID THEN 0
-                                           WHEN PREV_PLAYED IS NULL THEN 0
-                                           WHEN PLAYED <= PREV_PLAYED THEN 0
-                                           WHEN PREV_TIME IS NULL THEN 0
-                                           WHEN (PLAYED - PREV_PLAYED) > ((TIME - PREV_TIME) * 1000.0 * 3.0 * (CASE WHEN SPEED_MULT < 1.0 THEN 1.0 ELSE SPEED_MULT END) * (CASE WHEN SAMPLE_RATE_MULT < 1.0 THEN 1.0 ELSE SAMPLE_RATE_MULT END)) THEN 0
-                                           ELSE (PLAYED - PREV_PLAYED)
-                                       END AS DELTA_POS_MS,
-                                       SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
-                                   FROM ORDERED_DELTAS od
-                               ),
-                               AGGREGATED AS (
-                                   SELECT
-                                       SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID,
-                                       MAX(CASE WHEN DELTA_POS_MS > 0 THEN TIME END) AS MAX_TIME,
-                                       SUM(DELTA_POS_MS) AS SUM_DELTA,
-                                       SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) AS SUM_REALTIME,
-                                       SUM(DELTA_POS_MS * SPEED_MULT) AS SUM_SPEED_MULT,
-                                       SUM(DELTA_POS_MS * PITCH_SEMITONES) AS SUM_PITCH,
-                                       SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) AS SUM_SAMPLE_MULT
-                                   FROM CLEAN
-                                   GROUP BY SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID
-                                   HAVING SUM(DELTA_POS_MS) > 0
-                               )
-                               SELECT
-                                   datetime(agg.MAX_TIME, 'unixepoch','localtime') AS TIME,
-                                   a.VALUE AS ARTIST, al.VALUE AS ALBUM, ti.VALUE AS TRACK,
-                                   ROUND(agg.SUM_DELTA / 1000.0, 2) AS PLAYED_LENGTH_S,
-                                   ROUND(agg.SUM_REALTIME / 1000.0, 2) AS PLAYED_REALTIME_S,
-                                   ROUND(CASE WHEN agg.SUM_DELTA = 0 THEN 1.0 ELSE agg.SUM_SPEED_MULT / (agg.SUM_DELTA * 1.0) END, 4) AS AVG_SPEED_MULT,
-                                   ROUND(CASE WHEN agg.SUM_DELTA = 0 THEN 0.0 ELSE agg.SUM_PITCH / (agg.SUM_DELTA * 1.0) END, 3) AS AVG_PITCH,
-                                   ROUND(CASE WHEN agg.SUM_DELTA = 0 THEN 1.0 ELSE agg.SUM_SAMPLE_MULT / (agg.SUM_DELTA * 1.0) END, 4) AS AVG_SAMPLE_RATE_MULT
-                               FROM AGGREGATED agg
-                               LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
-                               LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
-                               LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
-                               ORDER BY agg.MAX_TIME DESC;
-                               ";
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
                 using (var cmd = new SQLiteCommand(sql, conn))
