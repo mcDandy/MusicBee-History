@@ -33,55 +33,54 @@ namespace MusicBeePlugin
             try
             {
                 var sql = @"WITH FILTERED_HISTORY AS (
-                              SELECT 
-                                  h.ID, h.TRACK_ID, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE, h.SPEED, h.SAMPLE_RATE
-                              FROM HISTORY h
-                              WHERE h.TIME > @MinTime
-                          ),
-                          ORDERED_EVENTS AS (
-                              SELECT 
-                                  fe.*,
-                                  LAG(fe.TRACK_ID) OVER (ORDER BY fe.ID) AS PREV_TRACK_ID,
-                                  LAG(fe.PLAY_HEAD) OVER (ORDER BY fe.ID) AS PREV_PLAY_HEAD,
-                                  LAG(fe.EVENT_TYPE) OVER (ORDER BY fe.ID) AS PREV_EVENT_TYPE,
-                                  LAG(fe.PLAYER_STATE) OVER (ORDER BY fe.ID) AS PREV_PLAYER_STATE
-                              FROM FILTERED_HISTORY fe
-                          ),
-                          MINUTES_CALCULATION AS (
-                              SELECT 
-                                  oe.TRACK_ID,
-                                  CASE
-                                      WHEN PREV_TRACK_ID = oe.TRACK_ID 
-                                           AND oe.PLAY_HEAD >= PREV_PLAY_HEAD
-                                           AND (
-                                              (oe.EVENT_TYPE IN (16, 48) OR (oe.EVENT_TYPE = 2 AND oe.PLAYER_STATE IN (6, 7)))
-                                              OR
-                                              (PREV_EVENT_TYPE IN (16, 48) OR (PREV_EVENT_TYPE = 2 AND PREV_PLAYER_STATE IN (6, 7)))
-                                           )
-                                      THEN (oe.PLAY_HEAD - PREV_PLAY_HEAD) 
-                                           / ( ((100.0 + oe.SPEED) / 100.0) * ((100.0 + oe.SAMPLE_RATE) / 100.0) )
-                                           / 60000.0
-                                      ELSE 0
-                                  END AS Realtime_Min
-                              FROM ORDERED_EVENTS oe
-                          ),
-                          AGGREGATED_TRACKS AS (
-                              SELECT 
-                                  TRACK_ID,
-                                  SUM(Realtime_Min) AS TrackMinutes
-                              FROM MINUTES_CALCULATION
-                              WHERE Realtime_Min > 0
-                              GROUP BY TRACK_ID
-                          )
-                          SELECT
-                              a.VALUE AS Artist,
-                              ROUND(SUM(agg.TrackMinutes), 2) AS MinutesPlayed
-                          FROM AGGREGATED_TRACKS agg
-                          JOIN TRACKS tr ON tr.ID = agg.TRACK_ID
-                          JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
-                          GROUP BY a.VALUE
-                          ORDER BY MinutesPlayed DESC;
-                          ";
+                                SELECT 
+                                    h.ID, h.TRACK_ID, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE, h.SPEED, h.SAMPLE_RATE,
+                                    tr.ARTIST_ID
+                                FROM HISTORY h
+                                JOIN TRACKS tr ON tr.ID = h.TRACK_ID
+                                WHERE h.TIME > @MinTime
+                            ),
+                            ORDERED_EVENTS AS (
+                                SELECT
+                                    fe.*,
+                                    LAG(fe.ARTIST_ID) OVER (ORDER BY fe.ID) AS PREV_ARTIST_ID,
+                                    LAG(fe.PLAY_HEAD) OVER (ORDER BY fe.ID) AS PREV_PLAY_HEAD,
+                                    LAG(fe.EVENT_TYPE) OVER (ORDER BY fe.ID) AS PREV_EVENT_TYPE,
+                                    LAG(fe.PLAYER_STATE) OVER (ORDER BY fe.ID) AS PREV_PLAYER_STATE
+                                FROM FILTERED_HISTORY fe
+                            ),
+                            MINUTES_CALCULATION AS (
+                                SELECT 
+                                    oe.ARTIST_ID,
+                                    CASE
+                                        WHEN PREV_ARTIST_ID = oe.ARTIST_ID 
+                                             AND oe.PLAY_HEAD >= PREV_PLAY_HEAD
+                                             AND (
+                                                (oe.EVENT_TYPE IN (16, 48) OR (oe.EVENT_TYPE = 2 AND oe.PLAYER_STATE IN (6, 7)))
+                                                OR
+                                                (PREV_EVENT_TYPE IN (16, 48) OR (PREV_EVENT_TYPE = 2 AND PREV_PLAYER_STATE IN (6, 7)))
+                                             )
+                                        THEN (oe.PLAY_HEAD - PREV_PLAY_HEAD) 
+                                             / ( ((100.0 + oe.SPEED) / 100.0) * ((100.0 + oe.SAMPLE_RATE) / 100.0) )
+                                             / 60000.0
+                                        ELSE 0
+                                    END AS Realtime_Min
+                                FROM ORDERED_EVENTS oe
+                            ),
+                            AGGREGATED AS (
+                                SELECT
+                                    ARTIST_ID,
+                                    SUM(Realtime_Min) AS MinutesPlayed
+                                FROM MINUTES_CALCULATION
+                                WHERE Realtime_Min > 0
+                                GROUP BY ARTIST_ID
+                            )
+                            SELECT
+                                a.VALUE AS Artist,
+                                ROUND(agg.MinutesPlayed, 2) AS MinutesPlayed
+                            FROM AGGREGATED agg
+                            JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
+                            ORDER BY MinutesPlayed DESC;";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
