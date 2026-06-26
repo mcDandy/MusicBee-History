@@ -29,6 +29,7 @@ namespace MusicBeePlugin
 
         private void LoadArtistTimeGrid()
         {
+            float minTime = (float)(DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60);
             try
             {
                 var sql = @"WITH FILTERED_HISTORY AS (
@@ -84,9 +85,13 @@ namespace MusicBeePlugin
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
-                using (var adapter = new SQLiteDataAdapter(sql, conn))
+                using (var cmd = new SQLiteCommand(sql, conn))
                 {
-                    adapter.Fill(table);
+                    cmd.Parameters.AddWithValue("@MinTime", minTime);
+                    using (var adapter = new SQLiteDataAdapter(cmd))
+                    {
+                        adapter.Fill(table);
+                    }
                 }
 
                 dataGridView1.AutoGenerateColumns = true;
@@ -99,6 +104,7 @@ namespace MusicBeePlugin
         }
         private void LoadTopSongsGrid()
         {
+            float minTime = (float)(DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60);
             try
             {
                 string sql = @"WITH FILTERED_HISTORY AS (
@@ -155,9 +161,13 @@ namespace MusicBeePlugin
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
-                using (var adapter = new SQLiteDataAdapter(sql, conn))
+                using (var cmd = new SQLiteCommand(sql, conn))
                 {
-                    adapter.Fill(table);
+                    cmd.Parameters.AddWithValue("@MinTime", minTime);
+                    using (var adapter = new SQLiteDataAdapter(cmd))
+                    {
+                        adapter.Fill(table);
+                    }
                 }
 
                 dataGridView2.AutoGenerateColumns = true;
@@ -170,6 +180,7 @@ namespace MusicBeePlugin
         }
         private void LoadHistoryGrid()
         {
+            float minTime = (float)(DateTimeOffset.Now.ToUnixTimeSeconds() - 30 * 24 * 60 * 60);
             try
             {
                 string sql = @"WITH FILTERED_HISTORY AS (
@@ -254,16 +265,16 @@ namespace MusicBeePlugin
                                LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
                                ORDER BY agg.MAX_TIME DESC;
                                ";
-
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
-                using (var adapter = new SQLiteDataAdapter(sql, conn))
+                using (var cmd = new SQLiteCommand(sql, conn))
                 {
-                    adapter.Fill(table);
+                    cmd.Parameters.AddWithValue("@MinTime", minTime);
+                    using (var adapter = new SQLiteDataAdapter(cmd))
+                    {
+                        adapter.Fill(table);
+                    }
                 }
-
-                dataGridView3.AutoGenerateColumns = true;
-                dataGridView3.DataSource = table;
             }
             catch (Exception ex)
             {
