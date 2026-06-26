@@ -31,30 +31,30 @@ namespace MusicBeePlugin
         {
             try
             {
-                var sql = @"SELECT 
+                var sql = @"SELECT
                                 a.Value AS Artist,
                                 ROUND(SUM(Realtime_Min), 2) AS MinutesPlayed
                             FROM (
-                                SELECT 
-                                    tr.Artist_Id, 
-                                    CASE 
-                                        WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id 
-                                             AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id) 
+                                SELECT
+                                    tr.Artist_Id,
+                                    CASE
+                                        WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id
+                                             AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)
                                              AND (
                                                 (h.Event_Type  in (16,48) OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
-                                                OR 
+                                                OR
                                                 (LAG(h.Event_Type) OVER (ORDER BY h.Id) in (16,48) OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
                                              )
-                                        THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
+                                        THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id))
                                              / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
                                              / 60000.0
-                                        ELSE 0 
+                                        ELSE 0
                                     END AS Realtime_Min
                                 FROM History h
                                 JOIN Tracks tr ON h.Track_Id = tr.Id
                             ) h
                             JOIN Artists a ON h.Artist_Id = a.Id
-                            WHERE h.Realtime_Min > 0 
+                            WHERE h.Realtime_Min > 0
                             GROUP BY a.Value
                             ORDER BY MinutesPlayed DESC;";
 
@@ -77,33 +77,33 @@ namespace MusicBeePlugin
         {
             try
             {
-                string sql = @"SELECT 
-                                   a.Value AS Artist, 
+                string sql = @"SELECT
+                                   a.Value AS Artist,
                                    t.Value AS Title,
                                    ROUND(SUM(Realtime_Min), 2) AS MinutesPlayed
                                FROM (
-                                   SELECT 
-                                       tr.Artist_Id, 
+                                   SELECT
+                                       tr.Artist_Id,
                                        tr.Title_Id,
-                                       CASE 
+                                       CASE
                                            WHEN LAG(tr.Title_Id) OVER (ORDER BY h.Id) = tr.Title_Id 
                                                 AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)
                                                 AND (
                                                    (h.Event_Type in (16,48) OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
-                                                   OR 
+                                                   OR
                                                    (LAG(h.Event_Type) OVER (ORDER BY h.Id) in (16,48) OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
                                                 )
                                            THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
                                                 / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
                                                 / 60000.0
-                                           ELSE 0 
+                                           ELSE 0
                                        END AS Realtime_Min
                                    FROM History h
                                    JOIN Tracks tr ON h.Track_Id = tr.Id
                                ) h
                                JOIN Artists a ON h.Artist_Id = a.Id
                                JOIN Titles t ON h.Title_Id = t.Id
-                               WHERE h.Realtime_Min > 0 
+                               WHERE h.Realtime_Min > 0
                                GROUP BY a.Value, t.Value
                                ORDER BY MinutesPlayed DESC;";
 

@@ -85,9 +85,9 @@ namespace MusicBeePlugin
                         using (SQLiteCommand cmd = conn.CreateCommand())
                         {
                             int? trackId = GetOrCreateTrackId(conn, aid, alid, tid, gid, urli, length);
-                            cmd.CommandText = @"INSERT INTO HISTORY 
+                            cmd.CommandText = @"INSERT INTO HISTORY
                                                 (TRACK_ID, PLAYER_STATE, EVENT_TYPE, PLAY_HEAD, TIME, SPEED, PITCH, SAMPLE_RATE, VOLUME_LEVEL, VOLUME_MUTE, REPEAT_MODE, SHUFFLE_MODE) 
-                                                VALUES 
+                                                VALUES
                                                 (@track_id, @player_state, @event_type, @play_head, @Time, @speed, @pitch, @sample_rate, @volume_level, @volume_mute, @repeat_mode, @shuffle_mode);";
                             cmd.Parameters.AddWithValue("@track_id", trackId);
                             cmd.Parameters.AddWithValue("@player_state", (int)state);
@@ -348,20 +348,28 @@ namespace MusicBeePlugin
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_artists_value ON ARTISTS (VALUE);";
+                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS ALBUMS (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_albums_value ON ALBUMS (VALUE);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS TITLES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_titles_value ON TITLES (VALUE);";
+                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS GENRES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
                     VALUE TEXT UNIQUE
                 )";
+                command.ExecuteNonQuery();
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_genres_value ON GENRES (VALUE);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS PLAYER_STATES (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -418,21 +426,13 @@ namespace MusicBeePlugin
                     FOREIGN KEY(REPEAT_MODE) REFERENCES REPEAT_MODES(ID)
                 )";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_track_id_lookup ON HISTORY (TRACK_ID, ID DESC, PLAY_HEAD);";
+                command.CommandText = @" CREATE INDEX IF NOT EXISTS idx_history_composite ON HISTORY (ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_events ON HISTORY(EVENT_TYPE, PLAYER_STATE);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_lookup ON TRACKS(ARTIST_ID, ALBUM_ID, TITLE_ID, GENRE_ID, URL_ID);";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_volume_lookup ON HISTORY(VOLUME_LEVEL, VOLUME_MUTE);";
-                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_playerstate_id ON HISTORY (PLAYER_STATE, ID DESC);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_trackid_time ON HISTORY (TRACK_ID, TIME);";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_time ON HISTORY (TIME);";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_title_id ON TRACKS (TITLE_ID);";
+                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_covering ON TRACKS (ID, TITLE_ID, ARTIST_ID, ALBUM_ID, GENRE_ID, LENGTH);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE VIEW IF NOT EXISTS HumanReadableHistory AS
                 SELECT 
