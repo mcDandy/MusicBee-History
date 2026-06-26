@@ -432,10 +432,6 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @" CREATE INDEX IF NOT EXISTS idx_history_composite ON HISTORY (ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID);";
                 command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_events ON HISTORY(EVENT_TYPE, PLAYER_STATE);";
-                command.ExecuteNonQuery();
-                command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_playerstate_id ON HISTORY (PLAYER_STATE, ID DESC);";
-                command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_tracks_covering ON TRACKS (ID, TITLE_ID, ARTIST_ID, ALBUM_ID, GENRE_ID, LENGTH);";
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE INDEX IF NOT EXISTS idx_history_ordered_covering ON HISTORY(ID ASC, EVENT_TYPE, PLAYER_STATE, TRACK_ID, TIME, PLAY_HEAD, SPEED, PITCH, SAMPLE_RATE);";
