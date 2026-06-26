@@ -129,34 +129,49 @@ namespace MusicBeePlugin
                 string sql = @"WITH FILTERED_HISTORY AS (
                                    SELECT
                                        h.ID, h.TIME, h.TRACK_ID, h.PLAY_HEAD AS PLAYED, h.EVENT_TYPE, h.PLAYER_STATE,
-                                       ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT, h.PITCH AS PITCH_SEMITONES, ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT
+                                       ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT, h.PITCH AS PITCH_SEMITONES, ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
+                                       tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH
                                    FROM HISTORY h
+                                   JOIN TRACKS tr ON tr.ID = h.TRACK_ID
                                    WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3) AND h.TIME > 0
                                ),
                                ORDERED_EVENTS AS (
                                  SELECT fe.*,
-                                   tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH,
-                                   IFNULL(tr.ARTIST_ID, -1) || ':' || IFNULL(tr.ALBUM_ID, -1) || ':' || IFNULL(tr.TITLE_ID, -1) || ':' || IFNULL(tr.GENRE_ID, -1) || ':' || IFNULL(ROUND(tr.LENGTH / 1000.0), -1) AS LOGICAL_TRACK_KEY,
-                                   LAG(IFNULL(tr.ARTIST_ID, -1) || ':' || IFNULL(tr.ALBUM_ID, -1) || ':' || IFNULL(tr.TITLE_ID, -1) || ':' || IFNULL(tr.GENRE_ID, -1) || ':' || IFNULL(ROUND(tr.LENGTH / 1000.0), -1)) OVER (ORDER BY fe.ID) AS PREV_LOGICAL_TRACK_KEY,
+                                   LAG(fe.ARTIST_ID) OVER (ORDER BY fe.ID) AS PREV_ARTIST_ID,
+                                   LAG(fe.ALBUM_ID) OVER (ORDER BY fe.ID) AS PREV_ALBUM_ID,
+                                   LAG(fe.TITLE_ID) OVER (ORDER BY fe.ID) AS PREV_TITLE_ID,
+                                   LAG(fe.GENRE_ID) OVER (ORDER BY fe.ID) AS PREV_GENRE_ID,
+                                   LAG(fe.LENGTH) OVER (ORDER BY fe.ID) AS PREV_LENGTH,
+
                                    LAG(fe.PLAYED) OVER (ORDER BY fe.ID) AS PREV_PLAYED,
                                    LAG(fe.TIME) OVER (ORDER BY fe.ID) AS PREV_TIME
                                  FROM FILTERED_HISTORY fe
-                                 JOIN TRACKS tr ON tr.ID = fe.TRACK_ID
                                ),
                                EVENT_DELTAS AS (
                                  SELECT oe.*,
                                    SUM(CASE
-                                           WHEN PREV_LOGICAL_TRACK_KEY IS NULL THEN 1
-                                           WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 1
+                                           WHEN PREV_TITLE_ID IS NULL THEN 1
+                                           WHEN IFNULL(PREV_ARTIST_ID, -1) != IFNULL(ARTIST_ID, -1) OR
+                                                IFNULL(PREV_ALBUM_ID, -1)  != IFNULL(ALBUM_ID, -1)  OR
+                                                IFNULL(PREV_TITLE_ID, -1)  != IFNULL(TITLE_ID, -1)  OR
+                                                IFNULL(PREV_GENRE_ID, -1)  != IFNULL(GENRE_ID, -1)  OR
+                                                IFNULL(PREV_LENGTH, -1)    != IFNULL(LENGTH, -1)    THEN 1
                                            WHEN EVENT_TYPE = 1 AND PLAYED < PREV_PLAYED THEN 1
                                            ELSE 0
                                        END) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
                                  FROM ORDERED_EVENTS oe
                                ),
+                               ORDERED_DELTAS AS (
+                                 SELECT ed.*,
+                                   -- Vytáhneme si SESSION_ID předchozího řádku pro bezpečné určení startu nové skladby
+                                   LAG(ed.SESSION_ID) OVER (ORDER BY ed.ID) AS PREV_SESSION_ID
+                                 FROM EVENT_DELTAS ed
+                               ),
                                CLEAN AS (
-                                   SELECT ed.SESSION_ID, ed.TIME, ed.LOGICAL_TRACK_KEY, ed.TITLE_ID, ed.ARTIST_ID, ed.ALBUM_ID,
+                                   SELECT od.SESSION_ID, od.TIME, od.TITLE_ID, od.ARTIST_ID, od.ALBUM_ID,
                                        CASE
-                                           WHEN PREV_LOGICAL_TRACK_KEY <> LOGICAL_TRACK_KEY THEN 0
+                                           -- Pokud se liší SESSION_ID, jsme na prvním řádku nové skladby -> delta je 0
+                                           WHEN PREV_SESSION_ID IS NOT NULL AND PREV_SESSION_ID != SESSION_ID THEN 0
                                            WHEN PREV_PLAYED IS NULL THEN 0
                                            WHEN PLAYED <= PREV_PLAYED THEN 0
                                            WHEN PREV_TIME IS NULL THEN 0
@@ -164,11 +179,11 @@ namespace MusicBeePlugin
                                            ELSE (PLAYED - PREV_PLAYED)
                                        END AS DELTA_POS_MS,
                                        SPEED_MULT, PITCH_SEMITONES, SAMPLE_RATE_MULT
-                                   FROM EVENT_DELTAS ed
+                                   FROM ORDERED_DELTAS od
                                ),
                                AGGREGATED AS (
                                    SELECT
-                                       SESSION_ID, LOGICAL_TRACK_KEY, TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                       SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID,
                                        MAX(CASE WHEN DELTA_POS_MS > 0 THEN TIME END) AS MAX_TIME,
                                        SUM(DELTA_POS_MS) AS SUM_DELTA,
                                        SUM(DELTA_POS_MS / SPEED_MULT / SAMPLE_RATE_MULT) AS SUM_REALTIME,
@@ -176,7 +191,7 @@ namespace MusicBeePlugin
                                        SUM(DELTA_POS_MS * PITCH_SEMITONES) AS SUM_PITCH,
                                        SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) AS SUM_SAMPLE_MULT
                                    FROM CLEAN
-                                   GROUP BY SESSION_ID, LOGICAL_TRACK_KEY, TITLE_ID, ARTIST_ID, ALBUM_ID
+                                   GROUP BY SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID
                                    HAVING SUM(DELTA_POS_MS) > 0
                                )
                                SELECT
