@@ -31,32 +31,56 @@ namespace MusicBeePlugin
         {
             try
             {
-                var sql = @"SELECT
-                                a.Value AS Artist,
-                                ROUND(SUM(Realtime_Min), 2) AS MinutesPlayed
-                            FROM (
-                                SELECT
-                                    tr.Artist_Id,
-                                    CASE
-                                        WHEN LAG(tr.Artist_Id) OVER (ORDER BY h.Id) = tr.Artist_Id
-                                             AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)
-                                             AND (
-                                                (h.Event_Type  in (16,48) OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
-                                                OR
-                                                (LAG(h.Event_Type) OVER (ORDER BY h.Id) in (16,48) OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
-                                             )
-                                        THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id))
-                                             / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
-                                             / 60000.0
-                                        ELSE 0
-                                    END AS Realtime_Min
-                                FROM History h
-                                JOIN Tracks tr ON h.Track_Id = tr.Id
-                            ) h
-                            JOIN Artists a ON h.Artist_Id = a.Id
-                            WHERE h.Realtime_Min > 0
-                            GROUP BY a.Value
-                            ORDER BY MinutesPlayed DESC;";
+                var sql = @"WITH FILTERED_HISTORY AS (
+                              SELECT 
+                                  h.ID, h.TRACK_ID, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE, h.SPEED, h.SAMPLE_RATE
+                              FROM HISTORY h
+                              WHERE h.TIME > @MinTime
+                          ),
+                          ORDERED_EVENTS AS (
+                              SELECT 
+                                  fe.*,
+                                  LAG(fe.TRACK_ID) OVER (ORDER BY fe.ID) AS PREV_TRACK_ID,
+                                  LAG(fe.PLAY_HEAD) OVER (ORDER BY fe.ID) AS PREV_PLAY_HEAD,
+                                  LAG(fe.EVENT_TYPE) OVER (ORDER BY fe.ID) AS PREV_EVENT_TYPE,
+                                  LAG(fe.PLAYER_STATE) OVER (ORDER BY fe.ID) AS PREV_PLAYER_STATE
+                              FROM FILTERED_HISTORY fe
+                          ),
+                          MINUTES_CALCULATION AS (
+                              SELECT 
+                                  oe.TRACK_ID,
+                                  CASE
+                                      WHEN PREV_TRACK_ID = oe.TRACK_ID 
+                                           AND oe.PLAY_HEAD >= PREV_PLAY_HEAD
+                                           AND (
+                                              (oe.EVENT_TYPE IN (16, 48) OR (oe.EVENT_TYPE = 2 AND oe.PLAYER_STATE IN (6, 7)))
+                                              OR
+                                              (PREV_EVENT_TYPE IN (16, 48) OR (PREV_EVENT_TYPE = 2 AND PREV_PLAYER_STATE IN (6, 7)))
+                                           )
+                                      THEN (oe.PLAY_HEAD - PREV_PLAY_HEAD) 
+                                           / ( ((100.0 + oe.SPEED) / 100.0) * ((100.0 + oe.SAMPLE_RATE) / 100.0) )
+                                           / 60000.0
+                                      ELSE 0
+                                  END AS Realtime_Min
+                              FROM ORDERED_EVENTS oe
+                          ),
+                          AGGREGATED_TRACKS AS (
+                              SELECT 
+                                  TRACK_ID,
+                                  SUM(Realtime_Min) AS TrackMinutes
+                              FROM MINUTES_CALCULATION
+                              WHERE Realtime_Min > 0
+                              GROUP BY TRACK_ID
+                          )
+                          SELECT
+                              a.VALUE AS Artist,
+                              ROUND(SUM(agg.TrackMinutes), 2) AS MinutesPlayed
+                          FROM AGGREGATED_TRACKS agg
+                          JOIN TRACKS tr ON tr.ID = agg.TRACK_ID
+                          JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
+                          GROUP BY a.VALUE
+                          ORDER BY MinutesPlayed DESC;
+                          ";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
@@ -77,35 +101,57 @@ namespace MusicBeePlugin
         {
             try
             {
-                string sql = @"SELECT
-                                   a.Value AS Artist,
-                                   t.Value AS Title,
-                                   ROUND(SUM(Realtime_Min), 2) AS MinutesPlayed
-                               FROM (
+                string sql = @"WITH FILTERED_HISTORY AS (
                                    SELECT
-                                       tr.Artist_Id,
-                                       tr.Title_Id,
+                                       h.ID, h.TRACK_ID, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE, h.SPEED, h.SAMPLE_RATE
+                                   FROM HISTORY h
+                                   WHERE h.TIME > @MinTime
+                               ),
+                               ORDERED_EVENTS AS (
+                                   SELECT
+                                       fe.*,
+                                       LAG(fe.TRACK_ID) OVER (ORDER BY fe.ID) AS PREV_TRACK_ID,
+                                       LAG(fe.PLAY_HEAD) OVER (ORDER BY fe.ID) AS PREV_PLAY_HEAD,
+                                       LAG(fe.EVENT_TYPE) OVER (ORDER BY fe.ID) AS PREV_EVENT_TYPE,
+                                       LAG(fe.PLAYER_STATE) OVER (ORDER BY fe.ID) AS PREV_PLAYER_STATE
+                                   FROM FILTERED_HISTORY fe
+                               ),
+                               MINUTES_CALCULATION AS (
+                                   SELECT
+                                       oe.TRACK_ID,
                                        CASE
-                                           WHEN LAG(tr.Title_Id) OVER (ORDER BY h.Id) = tr.Title_Id 
-                                                AND h.PLAY_HEAD >= LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)
+                                           WHEN PREV_TRACK_ID = oe.TRACK_ID
+                                                AND oe.PLAY_HEAD >= PREV_PLAY_HEAD
                                                 AND (
-                                                   (h.Event_Type in (16,48) OR (h.Event_Type = 2 AND h.Player_State IN (6, 7)))
+                                                   (oe.EVENT_TYPE IN (16, 48) OR (oe.EVENT_TYPE = 2 AND oe.PLAYER_STATE IN (6, 7)))
                                                    OR
-                                                   (LAG(h.Event_Type) OVER (ORDER BY h.Id) in (16,48) OR (LAG(h.Event_Type) OVER (ORDER BY h.Id) = 2 AND LAG(h.Player_State) OVER (ORDER BY h.Id) IN (6, 7)))
+                                                   (PREV_EVENT_TYPE IN (16, 48) OR (PREV_EVENT_TYPE = 2 AND PREV_PLAYER_STATE IN (6, 7)))
                                                 )
-                                           THEN (h.PLAY_HEAD - LAG(h.PLAY_HEAD) OVER (ORDER BY h.Id)) 
-                                                / ( ((100.0 + h.Speed) / 100.0) * ((100.0 + h.Sample_Rate) / 100.0) )
+                                           THEN (oe.PLAY_HEAD - PREV_PLAY_HEAD)
+                                                / ( ((100.0 + oe.SPEED) / 100.0) * ((100.0 + oe.SAMPLE_RATE) / 100.0) )
                                                 / 60000.0
                                            ELSE 0
                                        END AS Realtime_Min
-                                   FROM History h
-                                   JOIN Tracks tr ON h.Track_Id = tr.Id
-                               ) h
-                               JOIN Artists a ON h.Artist_Id = a.Id
-                               JOIN Titles t ON h.Title_Id = t.Id
-                               WHERE h.Realtime_Min > 0
-                               GROUP BY a.Value, t.Value
-                               ORDER BY MinutesPlayed DESC;";
+                                   FROM ORDERED_EVENTS oe
+                               ),
+                               AGGREGATED AS (
+                                   SELECT
+                                       TRACK_ID,
+                                       SUM(Realtime_Min) AS MinutesPlayed
+                                   FROM MINUTES_CALCULATION
+                                   WHERE Realtime_Min > 0
+                                   GROUP BY TRACK_ID
+                               )
+                               SELECT
+                                   a.VALUE AS Artist,
+                                   ti.VALUE AS Title,
+                                   ROUND(agg.MinutesPlayed, 2) AS MinutesPlayed
+                               FROM AGGREGATED agg
+                               JOIN TRACKS tr ON tr.ID = agg.TRACK_ID
+                               JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
+                               JOIN TITLES ti ON ti.ID = tr.TITLE_ID
+                               ORDER BY MinutesPlayed DESC;
+                               ";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
@@ -133,7 +179,7 @@ namespace MusicBeePlugin
                                        tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH
                                    FROM HISTORY h
                                    JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                                   WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3) AND h.TIME > 0
+                                   WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3) AND h.TIME > @MinTime
                                ),
                                ORDERED_EVENTS AS (
                                  SELECT fe.*,
