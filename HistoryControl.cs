@@ -183,7 +183,7 @@ namespace MusicBeePlugin
             try
             {
                 string sql = @"WITH BASE_HISTORY AS (
-                                   SELECT
+                                   SELECT 
                                        h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                        ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
                                        h.PITCH,
@@ -197,19 +197,18 @@ namespace MusicBeePlugin
                                        LAG(h.TIME) OVER (ORDER BY h.ID) AS PREV_TIME
                                    FROM HISTORY h
                                    LEFT JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                                   WHERE (h.EVENT_TYPE IN (1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
+                                   WHERE (h.EVENT_TYPE IN (0, 1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
                                      AND h.TIME > @MinTime
                                ),
                                SESSIONS AS (
                                    SELECT *,
                                        SUM(CASE
                                            WHEN PREV_EVENT_TYPE IS NULL THEN 1
-                                           WHEN PREV_EVENT_TYPE = 17 THEN 1
+                                           WHEN EVENT_TYPE = 1 THEN 1
                                            WHEN PREV_TITLE_ID IS NOT NULL AND TITLE_ID IS NOT NULL AND (
                                                 TITLE_ID  IS NOT PREV_TITLE_ID OR
                                                 ARTIST_ID IS NOT PREV_ARTIST_ID OR
                                                 ALBUM_ID  IS NOT PREV_ALBUM_ID) THEN 1
-                                           WHEN PLAY_HEAD < PREV_PLAY_HEAD THEN 1
                                            ELSE 0
                                        END) OVER (ORDER BY ID ROWS UNBOUNDED PRECEDING) AS SESSION_ID
                                    FROM BASE_HISTORY
@@ -225,7 +224,8 @@ namespace MusicBeePlugin
                                        CASE
                                            WHEN PREV_SESSION_ID IS NOT SESSION_ID THEN 0
                                            WHEN TITLE_ID IS NULL THEN 0
-                                           WHEN PREV_PLAY_HEAD IS NULL OR PLAY_HEAD <= PREV_PLAY_HEAD THEN 0
+                                           WHEN PREV_EVENT_TYPE IN (0, 17) THEN 0
+                                           WHEN PREV_PLAY_HEAD IS NULL OR PLAY_HEAD < PREV_PLAY_HEAD THEN 0
                                            WHEN (PLAY_HEAD - PREV_PLAY_HEAD) > ((TIME - PREV_TIME) * 3000.0 * MAX(1.0, SPEED_MULT) * MAX(1.0, SAMPLE_RATE_MULT)) THEN 0
                                            ELSE (PLAY_HEAD - PREV_PLAY_HEAD)
                                        END AS DELTA_POS_MS
@@ -258,7 +258,8 @@ namespace MusicBeePlugin
                                LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
                                LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
                                LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
-                               ORDER BY agg.MAX_TIME DESC;";
+                               ORDER BY agg.MAX_TIME DESC;
+                               ";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
