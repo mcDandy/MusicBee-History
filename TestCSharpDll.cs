@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Data.SQLite;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
-
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace MusicBeePlugin
 {
@@ -9,7 +12,8 @@ namespace MusicBeePlugin
     {
         private MusicBeeApiInterface mbApiInterface;
         private PluginInfo about = new PluginInfo();
-
+        System.Windows.Forms.ComboBox textBox;
+        int? savedSeconds=null;
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
         {
@@ -29,7 +33,7 @@ namespace MusicBeePlugin
                 about.MinInterfaceVersion = MinInterfaceVersion;
                 about.MinApiRevision = MinApiRevision;
                 about.ReceiveNotifications = (ReceiveNotificationFlags)0xff;
-                about.ConfigurationPanelHeight = 0;   // height in pixels that musicbee should reserve in a panel for config settings. When set, a handle to an empty panel will be passed to the Configure function
+                about.ConfigurationPanelHeight = 20;   // height in pixels that musicbee should reserve in a panel for config settings. When set, a handle to an empty panel will be passed to the Configure function
                 InitDatabase();
                 return about;
             }
@@ -54,12 +58,35 @@ namespace MusicBeePlugin
                 Label prompt = new Label();
                 prompt.AutoSize = true;
                 prompt.Location = new Point(0, 0);
-                prompt.Text = "prompt:";
-                TextBox textBox = new TextBox();
-                textBox.Bounds = new Rectangle(60, 0, 100, textBox.Height);
+                prompt.Text = "time to show:";
+                textBox = new System.Windows.Forms.ComboBox();
+                var options = new[]
+                {
+                     new { Text = "1 day",    Value = 86400 },
+                     new { Text = "1 week",   Value = 604800 },
+                     new { Text = "2 weeks",  Value = 1209600 },
+                     new { Text = "1 month",  Value = 2592000 },
+                     new { Text = "2 months", Value = 5184000 },
+                     new { Text = "1 year",   Value = 31536000 },
+                     new { Text = "All time", Value = int.MaxValue }
+                 };
+
+                textBox.DisplayMember = "Text";
+                textBox.ValueMember = "Value";
+                textBox.DataSource = options;
+                textBox.Bounds = new Rectangle(prompt.Location.X + prompt.Width + 10, 0, 100, textBox.Height);
+                string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
+                string dbFullPath = Path.Combine(appDataPath, DBNAME);
+                if(savedSeconds is null)
+                using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+                {
+                    conn.Open();
+                    SQLiteCommand c = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", conn);
+                    savedSeconds = c.ExecuteScalar() as int?;
+                }
                 configPanel.Controls.AddRange(new Control[] { prompt, textBox });
             }
-            return false;
+            return true;
         }
 
         // called by MusicBee when the user clicks Apply or Save in the MusicBee Preferences screen.
@@ -68,6 +95,16 @@ namespace MusicBeePlugin
         {
             // save any persistent settings in a sub-folder of this path
             string dataPath = mbApiInterface.Setting_GetPersistentStoragePath();
+            string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
+            string dbFullPath = Path.Combine(appDataPath, DBNAME);
+            savedSeconds = (int)textBox.SelectedValue;
+            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+            {
+                conn.Open();
+                SQLiteCommand c = new SQLiteCommand("INSERT OR REPLACE INTO SETTINGS (ID, VALUE) VALUES ('history_time', @value)", conn);
+                c.Parameters.AddWithValue("@value", savedSeconds);
+                c.ExecuteNonQuery();
+            }
         }
 
         // MusicBee is closing the plugin (plugin is being disabled by user or MusicBee is shutting down)

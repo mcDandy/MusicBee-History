@@ -30,9 +30,22 @@ namespace MusicBeePlugin
         private void LoadArtistTimeGrid()
         {
             long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
-            try
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
             {
-                var sql = @"WITH FILTERED_HISTORY AS (
+                cmd.Connection.Open();
+                var result = cmd.ExecuteScalar();
+                if (result != null && int.TryParse(result.ToString(), out int seconds))
+                {
+                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds;
+                }
+                else
+                {
+                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
+                }
+            }
+                try
+                {
+                    var sql = @"WITH FILTERED_HISTORY AS (
                                 SELECT 
                                     h.ID, h.TRACK_ID, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE, h.SPEED, h.SAMPLE_RATE,
                                     tr.ARTIST_ID
@@ -82,28 +95,42 @@ namespace MusicBeePlugin
                             JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
                             ORDER BY MinutesPlayed DESC;";
 
-                var table = new DataTable();
-                using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
-                using (var cmd = new SQLiteCommand(sql, conn))
-                {
-                    cmd.Parameters.AddWithValue("@MinTime", minTime);
-                    using (var adapter = new SQLiteDataAdapter(cmd))
+                    var table = new DataTable();
+                    using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
+                    using (var cmd = new SQLiteCommand(sql, conn))
                     {
-                        adapter.Fill(table);
+                        cmd.Parameters.AddWithValue("@MinTime", minTime);
+                        using (var adapter = new SQLiteDataAdapter(cmd))
+                        {
+                            adapter.Fill(table);
+                        }
                     }
+
+                    dataGridView1.AutoGenerateColumns = true;
+                    dataGridView1.DataSource = table;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.ToString());
                 }
 
-                dataGridView1.AutoGenerateColumns = true;
-                dataGridView1.DataSource = table;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.ToString());
-            }
         }
         private void LoadTopSongsGrid()
         {
             long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
+            {
+                cmd.Connection.Open();
+                var result = cmd.ExecuteScalar();
+                if (result != null && int.TryParse(result.ToString(), out int seconds))
+                {
+                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds;
+                }
+                else
+                {
+                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
+                }
+            }
             try
             {
                 string sql = @"WITH FILTERED_HISTORY AS (
@@ -179,7 +206,21 @@ namespace MusicBeePlugin
         }
         private void LoadHistoryGrid()
         {
-            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
+            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
+
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
+            {
+                cmd.Connection.Open();
+                var result = cmd.ExecuteScalar();
+                if (result != null && int.TryParse(result.ToString(), out int seconds))
+                {
+                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds;
+                }
+                else
+                {
+                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
+                }
+            }
             try
             {
                 string sql = @"WITH BASE_HISTORY AS (

@@ -479,6 +479,11 @@ namespace MusicBeePlugin
                      LEFT JOIN EVENT_TYPES et ON h.EVENT_TYPE = et.ID
                      ORDER BY h.Time DESC;";
                 command.ExecuteNonQuery();
+                command.CommandText = @"CREATE TABLE IF NOT EXISTS SETTINGS (
+                    ID TEXT PRIMARY KEY,
+                    VALUE TEXT
+                )";
+                command.ExecuteNonQuery();
             }
         }
 
