@@ -131,61 +131,75 @@ namespace MusicBeePlugin
                     minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
                 }
             }
-            try
+                try
             {
-                string sql = @"WITH FILTERED_HISTORY AS (
-                                   SELECT
-                                       h.ID, h.TRACK_ID, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE, h.SPEED, h.SAMPLE_RATE
-                                   FROM HISTORY h
-                                   WHERE h.TIME > @MinTime
-                               ),
-                               ORDERED_EVENTS AS (
-                                   SELECT
-                                       fe.*,
-                                       LAG(fe.TRACK_ID) OVER (ORDER BY fe.ID) AS PREV_TRACK_ID,
-                                       LAG(fe.PLAY_HEAD) OVER (ORDER BY fe.ID) AS PREV_PLAY_HEAD,
-                                       LAG(fe.EVENT_TYPE) OVER (ORDER BY fe.ID) AS PREV_EVENT_TYPE,
-                                       LAG(fe.PLAYER_STATE) OVER (ORDER BY fe.ID) AS PREV_PLAYER_STATE
-                                   FROM FILTERED_HISTORY fe
-                               ),
-                               MINUTES_CALCULATION AS (
-                                   SELECT
-                                       oe.TRACK_ID,
-                                       CASE
-                                           WHEN PREV_TRACK_ID = oe.TRACK_ID
-                                                AND oe.PLAY_HEAD >= PREV_PLAY_HEAD
-                                                AND (
-                                                   (oe.EVENT_TYPE IN (16, 48) OR (oe.EVENT_TYPE = 2 AND oe.PLAYER_STATE IN (6, 7)))
-                                                   OR
-                                                   (PREV_EVENT_TYPE IN (16, 48) OR (PREV_EVENT_TYPE = 2 AND PREV_PLAYER_STATE IN (6, 7)))
-                                                )
-                                           THEN (oe.PLAY_HEAD - PREV_PLAY_HEAD)
-                                                / ( ((100.0 + oe.SPEED) / 100.0) * ((100.0 + oe.SAMPLE_RATE) / 100.0) )
-                                                / 60000.0
-                                           ELSE 0
-                                       END AS Realtime_Min
-                                   FROM ORDERED_EVENTS oe
-                               ),
-                               AGGREGATED AS (
-                                   SELECT
-                                       TRACK_ID,
-                                       SUM(Realtime_Min) AS MinutesPlayed
-                                   FROM MINUTES_CALCULATION
-                                   WHERE Realtime_Min > 0
-                                   GROUP BY TRACK_ID
-                               )
-                               SELECT
-                                   a.VALUE AS Artist,
-                                   ti.VALUE AS Title,
-                                   ROUND(agg.MinutesPlayed, 2) AS MinutesPlayed
-                               FROM AGGREGATED agg
-                               JOIN TRACKS tr ON tr.ID = agg.TRACK_ID
-                               JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
-                               JOIN TITLES ti ON ti.ID = tr.TITLE_ID
-                               ORDER BY MinutesPlayed DESC;
-                               ";
+                    var sql = @"WITH NamedEvents AS (
+                                    SELECT
+                                        h.ID,
+                                        art.VALUE AS ARTIST,
+                                        alb.VALUE AS ALBUM,
+                                        t_tit.VALUE AS TRACK_NAME,
+                                        h.PLAYER_STATE,
+                                        h.EVENT_TYPE,
+                                        h.TIME AS CurrentTime,
+                                        h.PLAY_HEAD AS CurrentPlayHead
+                                    FROM HISTORY h
+                                    JOIN TRACKS t     ON h.TRACK_ID = t.ID
+                                    JOIN TITLES t_tit ON t.TITLE_ID = t_tit.ID
+                                    JOIN ARTISTS art  ON t.ARTIST_ID = art.ID
+                                    JOIN ALBUMS alb   ON t.ALBUM_ID = alb.ID
+                                    WHERE h.TIME >= @MinTime
+                                ),
+                                NextEvents AS (
+                                    SELECT
+                                        *,
+                                        LEAD(CurrentTime) OVER (ORDER BY ID) AS NextTime,
+                                        LEAD(CurrentPlayHead) OVER (ORDER BY ID) AS NextPlayHead,
+                                        LEAD(ARTIST) OVER (ORDER BY ID) AS NextArtist,
+                                        LEAD(ALBUM) OVER (ORDER BY ID) AS NextAlbum,
+                                        LEAD(TRACK_NAME) OVER (ORDER BY ID) AS NextTrackName
+                                    FROM NamedEvents
+                                ),
+                                TrackIntervals AS (
+                                    SELECT
+                                        ARTIST,
+                                        ALBUM,
+                                        TRACK_NAME,
+                                        CASE
+                                            WHEN PLAYER_STATE = 3 AND EVENT_TYPE NOT IN (0, 16)
+                                                 AND NextTime IS NOT NULL
+                                                 AND ARTIST = NextArtist
+                                                 AND ALBUM = NextAlbum
+                                                 AND TRACK_NAME = NextTrackName THEN
 
-                var table = new DataTable();
+                                                CASE
+                                                    WHEN NextPlayHead >= CurrentPlayHead
+                                                         AND (NextTime - CurrentTime) <= ((NextPlayHead - CurrentPlayHead) / 1000.0 + 5.0)
+                                                    THEN NextTime - CurrentTime
+
+                                                    WHEN NextPlayHead >= CurrentPlayHead
+                                                    THEN (NextPlayHead - CurrentPlayHead) / 1000.0
+
+                                                    WHEN (NextTime - CurrentTime) < 600
+                                                    THEN NextTime - CurrentTime
+
+                                                    ELSE 0
+                                                END
+                                            ELSE 0
+                                        END AS PlayedDuration
+                                    FROM NextEvents
+                                )
+                                SELECT
+                                    ARTIST,
+                                    ALBUM,
+                                    TRACK_NAME AS TRACK,
+                                    time(CAST(SUM(PlayedDuration) AS INT), 'unixepoch') AS TIME
+                                FROM TrackIntervals
+                                GROUP BY ARTIST, ALBUM, TRACK_NAME
+                                HAVING SUM(PlayedDuration) > 0
+                                ORDER BY SUM(PlayedDuration) DESC;";
+
+                    var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
