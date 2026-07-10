@@ -100,7 +100,7 @@ namespace MusicBeePlugin
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
                                         CASE
                                             WHEN MAX(LENGTH) > 0
-                                            THEN MIN((SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0, 100.0)
+                                            THEN (SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0
                                             ELSE 0
                                         END AS SessionPercentage
                                     FROM CLEANED_DELTAS
@@ -108,7 +108,6 @@ namespace MusicBeePlugin
                                     HAVING SUM(DELTA_POS_MS) > 0
                                 ),
                                 FINAL_SUMS AS (
-                                    -- Změna: Seskupujeme pouze podle ARTIST_ID
                                     SELECT
                                         ARTIST_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
@@ -118,14 +117,8 @@ namespace MusicBeePlugin
                                 )
                                 SELECT
                                     a.VALUE AS ARTIST,
-
-                                    CASE
-                                        WHEN CAST(TotalRealtimeSec AS INT) / 86400 > 0 
-                                        THEN (CAST(TotalRealtimeSec AS INT) / 86400) || ' d, ' || time(CAST(TotalRealtimeSec AS INT) % 86400, 'unixepoch')
-                                        ELSE time(CAST(TotalRealtimeSec AS INT), 'unixepoch')
-                                    END AS TIME,
-
-                                    ROUND(AvgPlayPercentage, 1) || ' %' AS PLAY_PERCENTAGE
+                                    TotalRealtimeSec AS PLAYED_TIME,
+                                    AvgPlayPercentage AS PLAY_PERCENTAGE
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
                                 ORDER BY TotalRealtimeSec DESC;
@@ -224,7 +217,7 @@ namespace MusicBeePlugin
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
                                         CASE
                                             WHEN MAX(LENGTH) > 0
-                                            THEN MIN((SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0, 100.0)
+                                            THEN (SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0
                                             ELSE 0
                                         END AS SessionPercentage
                                     FROM CLEANED_DELTAS
@@ -243,14 +236,8 @@ namespace MusicBeePlugin
                                     a.VALUE AS ARTIST,
                                     al.VALUE AS ALBUM,
                                     ti.VALUE AS TRACK,
-
-                                    CASE
-                                        WHEN CAST(TotalRealtimeSec AS INT) / 86400 > 0
-                                        THEN (CAST(TotalRealtimeSec AS INT) / 86400) || ' d, ' || time(CAST(TotalRealtimeSec AS INT) % 86400, 'unixepoch')
-                                        ELSE time(CAST(TotalRealtimeSec AS INT), 'unixepoch')
-                                    END AS TIME,
-
-                                    ROUND(AvgPlayPercentage, 1) || ' %' AS PLAY_PERCENTAGE
+                                    TotalRealtimeSec AS PLAYED_TIME,
+                                    AvgPlayPercentage AS PLAY_PERCENTAGE
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
                                 LEFT JOIN ALBUMS al ON al.ID = f.ALBUM_ID
@@ -368,7 +355,7 @@ namespace MusicBeePlugin
 
                                    CASE
                                        WHEN agg.TRACK_LENGTH > 0
-                                       THEN MIN((agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0, 100.0)
+                                       THEN (agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0
                                        ELSE 0.0
                                    END AS PLAY_PERCENTAGE,
 
@@ -456,11 +443,11 @@ namespace MusicBeePlugin
         {
 
         }
-        private void dataGridView3_Formatting(object sender, DataGridViewCellFormattingEventArgs e)
+        private void dataGridView_Formatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.Value == null || e.Value == DBNull.Value) return;
 
-            string columnName = dataGridView3.Columns[e.ColumnIndex].Name;
+            string columnName = ((DataGridView)sender).Columns[e.ColumnIndex].Name;
 
             if (columnName == "PLAY_PERCENTAGE")
             {

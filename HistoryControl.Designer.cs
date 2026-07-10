@@ -82,6 +82,7 @@
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.Size = new System.Drawing.Size(136, 118);
             this.dataGridView1.TabIndex = 0;
+            this.dataGridView1.CellFormatting += dataGridView_Formatting;
             this.dataGridView1.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView1_CellContentClick);
             // 
             // tabPage2
@@ -108,6 +109,7 @@
             this.dataGridView2.ReadOnly = true;
             this.dataGridView2.Size = new System.Drawing.Size(136, 118);
             this.dataGridView2.TabIndex = 1;
+            this.dataGridView2.CellFormatting += dataGridView_Formatting;
             this.dataGridView2.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView2_CellContentClick);
             // 
             // tabPage3
@@ -134,7 +136,7 @@
             this.dataGridView3.ReadOnly = true;
             this.dataGridView3.Size = new System.Drawing.Size(136, 118);
             this.dataGridView3.TabIndex = 1;
-            dataGridView3.CellFormatting += dataGridView3_Formatting;
+            this.dataGridView3.CellFormatting += dataGridView_Formatting;
             this.dataGridView3.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView3_CellContentClick);
             // 
             // HistoryControl

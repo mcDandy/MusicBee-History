@@ -87,6 +87,7 @@ namespace MusicBeePlugin
                     SQLiteCommand c = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", conn);
                     savedSeconds = c.ExecuteScalar() as int?;
                 }
+                textBox.SelectedValue = savedSeconds??options[5].Value;
                 configPanel.Controls.AddRange(new Control[] { prompt, textBox });
             }
             return true;
