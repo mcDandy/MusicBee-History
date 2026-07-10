@@ -62,11 +62,14 @@ namespace MusicBeePlugin
                 textBox = new System.Windows.Forms.ComboBox();
                 var options = new[]
                 {
+                     new { Text = "1 hour", Value = 3600 },
+                     new { Text = "6 hours",  Value = 21600 },
                      new { Text = "1 day",    Value = 86400 },
                      new { Text = "1 week",   Value = 604800 },
                      new { Text = "2 weeks",  Value = 1209600 },
                      new { Text = "1 month",  Value = 2592000 },
-                     new { Text = "2 months", Value = 5184000 },
+                     new { Text = "3 months", Value = 5184000 },
+                     new { Text = "6 months", Value = 15552000 },
                      new { Text = "1 year",   Value = 31536000 },
                      new { Text = "All time", Value = int.MaxValue }
                  };
