@@ -33,7 +33,7 @@ namespace MusicBeePlugin
                 about.MinInterfaceVersion = MinInterfaceVersion;
                 about.MinApiRevision = MinApiRevision;
                 about.ReceiveNotifications = (ReceiveNotificationFlags)0xff;
-                about.ConfigurationPanelHeight = 20;   // height in pixels that musicbee should reserve in a panel for config settings. When set, a handle to an empty panel will be passed to the Configure function
+                about.ConfigurationPanelHeight = 25;   // height in pixels that musicbee should reserve in a panel for config settings. When set, a handle to an empty panel will be passed to the Configure function
                 InitDatabase();
                 return about;
             }
@@ -47,11 +47,7 @@ namespace MusicBeePlugin
 
         public bool Configure(IntPtr panelHandle)
         {
-            // save any persistent settings in a sub-folder of this path
             string dataPath = mbApiInterface.Setting_GetPersistentStoragePath();
-            // panelHandle will only be set if you set about.ConfigurationPanelHeight to a non-zero value
-            // keep in mind the panel width is scaled according to the font the user has selected
-            // if about.ConfigurationPanelHeight is set to 0, you can display your own popup window
             if (panelHandle != IntPtr.Zero)
             {
                 Panel configPanel = (Panel)Control.FromHandle(panelHandle);
@@ -59,36 +55,53 @@ namespace MusicBeePlugin
                 prompt.AutoSize = true;
                 prompt.Location = new Point(0, 0);
                 prompt.Text = "time to show:";
+
+                // Přidáme nejprve label, aby WinForms správně propočítal jeho Width
+                configPanel.Controls.Add(prompt);
+
                 textBox = new System.Windows.Forms.ComboBox();
+
+                // Použití vestavěného KeyValuePair<string, int>
                 var options = new[]
                 {
-                     new { Text = "1 hour", Value = 3600 },
-                     new { Text = "6 hours",  Value = 21600 },
-                     new { Text = "1 day",    Value = 86400 },
-                     new { Text = "1 week",   Value = 604800 },
-                     new { Text = "2 weeks",  Value = 1209600 },
-                     new { Text = "1 month",  Value = 2592000 },
-                     new { Text = "3 months", Value = 5184000 },
-                     new { Text = "6 months", Value = 15552000 },
-                     new { Text = "1 year",   Value = 31536000 },
-                     new { Text = "All time", Value = int.MaxValue }
-                 };
+                     new KeyValuePair<string, int>("1 hour", 3600),
+                     new KeyValuePair<string, int>("6 hours", 21600),
+                     new KeyValuePair<string, int>("1 day", 86400),
+                     new KeyValuePair<string, int>("1 week", 604800),
+                     new KeyValuePair<string, int>("2 weeks", 1209600),
+                     new KeyValuePair<string, int>("1 month", 2592000),
+                     new KeyValuePair<string, int>("3 months", 5184000),
+                     new KeyValuePair<string, int>("6 months", 15552000),
+                     new KeyValuePair<string, int>("1 year", 31536000),
+                     new KeyValuePair<string, int>("All time", int.MaxValue)
+                };
 
-                textBox.DisplayMember = "Text";
+                textBox.DisplayMember = "Key";
                 textBox.ValueMember = "Value";
                 textBox.DataSource = options;
                 textBox.Bounds = new Rectangle(prompt.Location.X + prompt.Width + 10, 0, 100, textBox.Height);
+
                 string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
                 string dbFullPath = Path.Combine(appDataPath, DBNAME);
-                if(savedSeconds is null)
-                using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+
+                if (savedSeconds is null)
                 {
-                    conn.Open();
-                    SQLiteCommand c = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", conn);
-                    savedSeconds = c.ExecuteScalar() as int?;
+                    using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+                    {
+                        conn.Open();
+                        using (SQLiteCommand c = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", conn))
+                        {
+                            object result = c.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                savedSeconds = Convert.ToInt32(result);
+                            }
+                        }
+                    }
                 }
-                textBox.SelectedValue = savedSeconds??options[5].Value;
-                configPanel.Controls.AddRange(new Control[] { prompt, textBox });
+
+                textBox.SelectedValue = savedSeconds ?? options[5].Value;
+                configPanel.Controls.Add(textBox);
             }
             return true;
         }
@@ -97,17 +110,22 @@ namespace MusicBeePlugin
         // its up to you to figure out whether anything has changed and needs updating
         public void SaveSettings()
         {
-            // save any persistent settings in a sub-folder of this path
-            string dataPath = mbApiInterface.Setting_GetPersistentStoragePath();
             string appDataPath = mbApiInterface.Setting_GetPersistentStoragePath();
             string dbFullPath = Path.Combine(appDataPath, DBNAME);
-            savedSeconds = (int)textBox.SelectedValue;
-            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+
+            if (textBox.SelectedValue != null)
             {
-                conn.Open();
-                SQLiteCommand c = new SQLiteCommand("INSERT OR REPLACE INTO SETTINGS (ID, VALUE) VALUES ('history_time', @value)", conn);
-                c.Parameters.AddWithValue("@value", savedSeconds);
-                c.ExecuteNonQuery();
+                savedSeconds = (int?)textBox.SelectedValue;
+
+                using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+                {
+                    conn.Open();
+                    using (SQLiteCommand c = new SQLiteCommand("INSERT OR REPLACE INTO SETTINGS (ID, VALUE) VALUES ('history_time', @value)", conn))
+                    {
+                        c.Parameters.AddWithValue("@value", savedSeconds);
+                        c.ExecuteNonQuery();
+                    }
+                }
             }
         }
 

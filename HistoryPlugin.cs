@@ -481,7 +481,7 @@ namespace MusicBeePlugin
                 command.ExecuteNonQuery();
                 command.CommandText = @"CREATE TABLE IF NOT EXISTS SETTINGS (
                     ID TEXT PRIMARY KEY,
-                    VALUE TEXT
+                    VALUE INTEGER
                 )";
                 command.ExecuteNonQuery();
             }
