@@ -100,8 +100,8 @@ namespace MusicBeePlugin
                     }
                 }
 
-                textBox.SelectedValue = savedSeconds ?? options[5].Value;
                 configPanel.Controls.Add(textBox);
+                textBox.SelectedValue = savedSeconds ?? options[5].Value;
             }
             return true;
         }
