@@ -119,7 +119,6 @@ namespace MusicBeePlugin
                                 SELECT
                                     a.VALUE AS ARTIST,
 
-                                    -- Dynamické formátování: pokud čas přesáhne 24 hodin (86400 sekund), přidá dny
                                     CASE
                                         WHEN CAST(TotalRealtimeSec AS INT) / 86400 > 0 
                                         THEN (CAST(TotalRealtimeSec AS INT) / 86400) || ' d, ' || time(CAST(TotalRealtimeSec AS INT) % 86400, 'unixepoch')
@@ -240,7 +239,6 @@ namespace MusicBeePlugin
                                     FROM AGGREGATED_PER_SESSION
                                     GROUP BY TITLE_ID, ARTIST_ID, ALBUM_ID
                                 )
-                                -- Finální výstup s překladem ID na texty, formátem dnů a procentem ukončení
                                 SELECT
                                     a.VALUE AS ARTIST,
                                     al.VALUE AS ALBUM,
