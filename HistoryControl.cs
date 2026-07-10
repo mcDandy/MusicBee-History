@@ -46,7 +46,7 @@ namespace MusicBeePlugin
                 try
                 {
                     var sql = @"WITH BASE_HISTORY AS (
-                                    SELECT 
+                                    SELECT
                                         h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                         ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
                                         h.PITCH,
@@ -98,10 +98,10 @@ namespace MusicBeePlugin
                                     SELECT
                                         ARTIST_ID,
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
-                                        CASE 
-                                            WHEN MAX(LENGTH) > 0 
+                                        CASE
+                                            WHEN MAX(LENGTH) > 0
                                             THEN MIN((SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0, 100.0)
-                                            ELSE 0 
+                                            ELSE 0
                                         END AS SessionPercentage
                                     FROM CLEANED_DELTAS
                                     GROUP BY SESSION_ID, ARTIST_ID
@@ -118,14 +118,14 @@ namespace MusicBeePlugin
                                 )
                                 SELECT
                                     a.VALUE AS ARTIST,
-                                    
+
                                     -- Dynamické formátování: pokud čas přesáhne 24 hodin (86400 sekund), přidá dny
-                                    CASE 
+                                    CASE
                                         WHEN CAST(TotalRealtimeSec AS INT) / 86400 > 0 
                                         THEN (CAST(TotalRealtimeSec AS INT) / 86400) || ' d, ' || time(CAST(TotalRealtimeSec AS INT) % 86400, 'unixepoch')
                                         ELSE time(CAST(TotalRealtimeSec AS INT), 'unixepoch')
                                     END AS TIME,
-                                    
+
                                     ROUND(AvgPlayPercentage, 1) || ' %' AS PLAY_PERCENTAGE
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
@@ -171,7 +171,7 @@ namespace MusicBeePlugin
                 try
             {
                     var sql = @"WITH BASE_HISTORY AS (
-                                    SELECT 
+                                    SELECT
                                         h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                         ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
                                         h.PITCH,
@@ -223,10 +223,10 @@ namespace MusicBeePlugin
                                     SELECT
                                         TITLE_ID, ARTIST_ID, ALBUM_ID,
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
-                                        CASE 
-                                            WHEN MAX(LENGTH) > 0 
+                                        CASE
+                                            WHEN MAX(LENGTH) > 0
                                             THEN MIN((SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0, 100.0)
-                                            ELSE 0 
+                                            ELSE 0
                                         END AS SessionPercentage
                                     FROM CLEANED_DELTAS
                                     GROUP BY SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID
@@ -245,13 +245,13 @@ namespace MusicBeePlugin
                                     a.VALUE AS ARTIST,
                                     al.VALUE AS ALBUM,
                                     ti.VALUE AS TRACK,
-                                    
-                                    CASE 
-                                        WHEN CAST(TotalRealtimeSec AS INT) / 86400 > 0 
+
+                                    CASE
+                                        WHEN CAST(TotalRealtimeSec AS INT) / 86400 > 0
                                         THEN (CAST(TotalRealtimeSec AS INT) / 86400) || ' d, ' || time(CAST(TotalRealtimeSec AS INT) % 86400, 'unixepoch')
                                         ELSE time(CAST(TotalRealtimeSec AS INT), 'unixepoch')
                                     END AS TIME,
-                                    
+
                                     ROUND(AvgPlayPercentage, 1) || ' %' AS PLAY_PERCENTAGE
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
@@ -299,7 +299,7 @@ namespace MusicBeePlugin
             try
             {
                 string sql = @"WITH BASE_HISTORY AS (
-                                   SELECT 
+                                   SELECT
                                        h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                        ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
                                        h.PITCH,
@@ -366,25 +366,24 @@ namespace MusicBeePlugin
                                    a.VALUE AS ARTIST,
                                    al.VALUE AS ALBUM,
                                    ti.VALUE AS TRACK,
-                                   
-                                   CASE 
-                                       WHEN CAST(agg.SUM_REALTIME / 1000.0 AS INT) / 86400 > 0 
+
+                                   CASE
+                                       WHEN CAST(agg.SUM_REALTIME / 1000.0 AS INT) / 86400 > 0
                                        THEN (CAST(agg.SUM_REALTIME / 1000.0 AS INT) / 86400) || ' d, ' || time(CAST(agg.SUM_REALTIME / 1000.0 AS INT) % 86400, 'unixepoch')
                                        ELSE time(CAST(agg.SUM_REALTIME / 1000.0 AS INT), 'unixepoch')
                                    END AS PLAYED_TIME,
-                                   
-                                   -- 3. Procento odehrání v této relaci vůči celkové délce skladby (max 100 %)
-                                   CASE 
-                                       WHEN agg.TRACK_LENGTH > 0 
+
+                                   CASE
+                                       WHEN agg.TRACK_LENGTH > 0
                                        THEN ROUND(MIN((agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0, 100.0), 1) || ' %'
                                        ELSE '0 %'
                                    END AS PLAY_PERCENTAGE,
-                                   
-                                   CASE 
-                                       WHEN ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) != 1.00 
-                                            OR ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) != 0.00 
-                                            OR ROUND(agg.SUM_SAMPLE_MULT / agg.SUM_DELTA, 2) != 1.00
-                                       THEN 
+
+                                   CASE
+                                       WHEN ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) != 1.0
+                                            OR ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) != 0.0
+                                            OR ROUND(agg.SUM_SAMPLE_MULT / agg.SUM_DELTA, 2) != 1.0
+                                       THEN
                                            SUBSTR(
                                                CASE WHEN ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) != 1.00 THEN ', Speed: ' || ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) || 'x' ELSE '' END ||
                                                CASE WHEN ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) != 0.00 THEN ', Pitch: ' || ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) ELSE '' END ||
