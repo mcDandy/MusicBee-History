@@ -366,17 +366,12 @@ namespace MusicBeePlugin
                                    a.VALUE AS ARTIST,
                                    al.VALUE AS ALBUM,
                                    ti.VALUE AS TRACK,
-
-                                   CASE
-                                       WHEN CAST(agg.SUM_REALTIME / 1000.0 AS INT) / 86400 > 0
-                                       THEN (CAST(agg.SUM_REALTIME / 1000.0 AS INT) / 86400) || ' d, ' || time(CAST(agg.SUM_REALTIME / 1000.0 AS INT) % 86400, 'unixepoch')
-                                       ELSE time(CAST(agg.SUM_REALTIME / 1000.0 AS INT), 'unixepoch')
-                                   END AS PLAYED_TIME,
+                                   agg.SUM_REALTIME / 1000.0 AS PLAYED_TIME,
 
                                    CASE
                                        WHEN agg.TRACK_LENGTH > 0
-                                       THEN ROUND(MIN((agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0, 100.0), 1) || ' %'
-                                       ELSE '0 %'
+                                       THEN MIN((agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0, 100.0)
+                                       ELSE 0.0
                                    END AS PLAY_PERCENTAGE,
 
                                    CASE
@@ -396,8 +391,7 @@ namespace MusicBeePlugin
                                LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
                                LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
                                LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
-                               ORDER BY agg.MAX_TIME DESC;
-                               ;";
+                               ORDER BY agg.MAX_TIME DESC;";
 
                 var table = new DataTable();
                 using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
@@ -463,6 +457,35 @@ namespace MusicBeePlugin
         private void dataGridView3_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
 
+        }
+        private void dataGridView3_Formatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.Value == null || e.Value == DBNull.Value) return;
+
+            string columnName = dataGridView3.Columns[e.ColumnIndex].Name;
+
+            if (columnName == "PLAY_PERCENTAGE")
+            {
+                if (double.TryParse(e.Value.ToString(), out double percent))
+                {
+                    e.Value = $"{percent:F1} %";
+                    e.FormattingApplied = true;
+                }
+            }
+            else if (columnName == "PLAYED_TIME")
+            {
+                if (double.TryParse(e.Value.ToString(), out double totalSeconds))
+                {
+                    int seconds = (int)totalSeconds;
+                    int days = seconds / 86400;
+                    int remainder = seconds % 86400;
+
+                    TimeSpan ts = TimeSpan.FromSeconds(remainder);
+                    string timePart = ts.ToString(@"hh\:mm\:ss");
+                    e.Value = days > 0 ? $"{days} d, {timePart}" : timePart;
+                    e.FormattingApplied = true;
+                }
+            }
         }
     }
 }

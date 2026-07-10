@@ -134,6 +134,7 @@
             this.dataGridView3.ReadOnly = true;
             this.dataGridView3.Size = new System.Drawing.Size(136, 118);
             this.dataGridView3.TabIndex = 1;
+            dataGridView3.CellFormatting += dataGridView3_CellFormatting;
             this.dataGridView3.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView3_CellContentClick);
             // 
             // HistoryControl
