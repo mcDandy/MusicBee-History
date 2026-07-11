@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
@@ -107,7 +107,9 @@ namespace MusicBeePlugin
                             }
                             catch (Exception ex)
                             {
-                                MessageBox.Show(ex.ToString());
+                                MessageBox.Show(
+                                    "SQL: " + cmd.CommandText + "\n\n" + ex.ToString(),
+                                    "History Plugin Error");
                             }
                         }
                     }
@@ -118,7 +120,7 @@ namespace MusicBeePlugin
                 lastEventTime = DateTime.UtcNow;
             }
 
-
+        }
 
             int? GetOrCreateArtistId(SQLiteConnection conn, string name)
             {
@@ -247,9 +249,14 @@ namespace MusicBeePlugin
                     cmd.CommandText = "INSERT INTO PLAYER_STATES (ID,VALUE) VALUES (@id,@name);";
                     cmd.Parameters.AddWithValue("@id", (int)state);
                     cmd.Parameters.AddWithValue("@name", state.ToString());
-
-                    cmd.ExecuteNonQuery();
-
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("SQL: " + cmd.CommandText + "\n\n" + ex, "History Plugin – CreateState");
+                    }
                 }
 
             }
@@ -275,7 +282,7 @@ namespace MusicBeePlugin
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(ex.ToString());
+                        MessageBox.Show("SQL: " + cmd.CommandText + "\n\n" + ex, "History Plugin – CreateEventType");
                     }
                 }
 
@@ -323,12 +330,12 @@ namespace MusicBeePlugin
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(ex.ToString());
+                        MessageBox.Show("SQL: " + cmd.CommandText + "\n\n" + ex, "History Plugin – CreateRepeatMode");
                         return null;
                     }
                 }
             }
-        }
+
 
         private void InitDatabase()
         {
@@ -487,40 +494,5 @@ namespace MusicBeePlugin
             }
         }
 
-        public int OnDockablePanelCreated(Control panel)
-        {
-            void BuildPanel()
-            {
-                panel.SuspendLayout();
-                panel.Controls.Clear();
-
-                var historyPanel = new HistoryControl(
-                    Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
-                {
-                    AutoSize = false,
-                    Dock = DockStyle.None,
-                    Margin = Padding.Empty,
-                    Padding = Padding.Empty
-                };
-
-                panel.Controls.Add(historyPanel);
-
-                void ResizeChild(object s, EventArgs e)
-                {
-                    historyPanel.Bounds = panel.ClientRectangle;
-                }
-
-                panel.Resize -= ResizeChild;
-                panel.Resize += ResizeChild;
-                ResizeChild(panel, EventArgs.Empty);
-
-                panel.ResumeLayout(true);
-            }
-
-            if (panel.InvokeRequired) panel.Invoke((MethodInvoker)BuildPanel);
-            else BuildPanel();
-
-            return -1;
-        }
     }
 }

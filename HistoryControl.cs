@@ -140,7 +140,7 @@ namespace MusicBeePlugin
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.ToString());
+                    MessageBox.Show("Error loading history (artist): " + ex.ToString());
                 }
 
         }
@@ -261,7 +261,7 @@ namespace MusicBeePlugin
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                MessageBox.Show("Error loading history (songs): " + ex.ToString());
             }
         }
         private void LoadHistoryGrid()
@@ -393,7 +393,7 @@ namespace MusicBeePlugin
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                MessageBox.Show("Error loading history (full): " + ex.ToString());
             }
         }
 
