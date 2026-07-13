@@ -22,10 +22,10 @@ namespace MusicBeePlugin
                 mbApiInterface = new MusicBeeApiInterface();
                 mbApiInterface.Initialise(apiInterfacePtr);
                 about.PluginInfoVersion = PluginInfoVersion;
-                about.Name = "Another History Plugin";
-                about.Description = "A history plugin for MusicBee. Sees everything that happens in the playhead.";
+                about.Name = "Detailed History";
+                about.Description = "A history plugin for MusicBee. Sees (nearly) everything that happens to the playhead.";
                 about.Author = "mkDaniel";
-                about.TargetApplication = "Historyy";   //  the name of a Plugin Storage device or panel header for a dockable panel
+                about.TargetApplication = "Detailed History";   //  the name of a Plugin Storage device or panel header for a dockable panel
                 about.Type = PluginType.General;
                 about.VersionMajor = 1;  // your plugin version
                 about.VersionMinor = 0;
@@ -39,7 +39,6 @@ namespace MusicBeePlugin
             }
             catch (Exception ex)
             {
-                // Tohle vám řekne přesně, co chybí
                 MessageBox.Show(ex.Message + "\n\n" + ex.StackTrace);
                 return null;
             }
@@ -56,17 +55,16 @@ namespace MusicBeePlugin
                 prompt.Location = new Point(0, 0);
                 prompt.Text = "time to show:";
 
-                // Přidáme nejprve label, aby WinForms správně propočítal jeho Width
                 configPanel.Controls.Add(prompt);
-
                 textBox = new System.Windows.Forms.ComboBox();
 
-                // Použití vestavěného KeyValuePair<string, int>
                 var options = new[]
                 {
                      new KeyValuePair<string, int>("1 hour", 3600),
                      new KeyValuePair<string, int>("6 hours", 21600),
+                     new KeyValuePair<string, int>("12 hours", 43200),
                      new KeyValuePair<string, int>("1 day", 86400),
+                     new KeyValuePair<string, int>("3 days", 259200),
                      new KeyValuePair<string, int>("1 week", 604800),
                      new KeyValuePair<string, int>("2 weeks", 1209600),
                      new KeyValuePair<string, int>("1 month", 2592000),
