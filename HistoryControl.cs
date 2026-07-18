@@ -68,8 +68,11 @@ namespace MusicBeePlugin
             var grid = (DataGridView)sender;
             var row = grid.Rows[e.RowIndex];
 
+            if (!grid.Columns.Contains("TRACK"))
+                return;
+
             string artist = row.Cells["ARTIST"].Value?.ToString();
-            string album = row.Cells["ALBUM"].Value?.ToString();
+            string album = grid.Columns.Contains("ALBUM") ? row.Cells["ALBUM"].Value?.ToString() : null;
             string track = row.Cells["TRACK"].Value?.ToString();
 
             if (string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(track))
