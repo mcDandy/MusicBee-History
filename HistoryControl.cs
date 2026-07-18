@@ -42,6 +42,22 @@ namespace MusicBeePlugin
             return defaultValue;
         }
 
+        private void ConfigureGrid(DataGridView grid)
+        {
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.MultiSelect = false;
+            grid.ReadOnly = true;
+            grid.AllowUserToAddRows = false;
+            grid.AllowUserToDeleteRows = false;
+            grid.AllowUserToResizeRows = false;
+            grid.RowHeadersVisible = false;
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.AlternatingRowsDefaultCellStyle.BackColor = System.Drawing.Color.FromArgb(250, 250, 250);
+            grid.GridColor = System.Drawing.Color.FromArgb(230, 230, 230);
+            grid.CellFormatting += dataGridView_Formatting;
+        }
+
         private void LoadArtistTimeGrid()
         {
             int showSeconds = GetSettingInt("history_time", 30 * 24 * 60 * 60);
@@ -150,6 +166,7 @@ namespace MusicBeePlugin
 
                     dataGridView1.AutoGenerateColumns = true;
                     dataGridView1.DataSource = table;
+                    ConfigureGrid(dataGridView1);
                 }
                 catch (Exception ex)
                 {
@@ -269,6 +286,7 @@ namespace MusicBeePlugin
 
                 dataGridView2.AutoGenerateColumns = true;
                 dataGridView2.DataSource = table;
+                ConfigureGrid(dataGridView2);
             }
             catch (Exception ex)
             {
@@ -278,6 +296,7 @@ namespace MusicBeePlugin
         private void LoadHistoryGrid()
         {
             int showSeconds = GetSettingInt("history_time", 30 * 24 * 60 * 60);
+            int skipThreshold = GetSettingInt("skip_threshold", 30);
             long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - showSeconds;
 
             try
@@ -389,6 +408,7 @@ namespace MusicBeePlugin
                 }
                 dataGridView3.AutoGenerateColumns = true;
                 dataGridView3.DataSource = table;
+                ConfigureGrid(dataGridView3);
             }
             catch (Exception ex)
             {
