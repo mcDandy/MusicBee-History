@@ -305,9 +305,8 @@ namespace MusicBeePlugin
                                    SELECT
                                        h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                        ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
-                                       h.PITCH,
                                        ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
-                                       tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH,
+                                       tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.LENGTH,
                                        LAG(tr.TITLE_ID) OVER (ORDER BY h.ID) AS PREV_TITLE_ID,
                                        LAG(tr.ARTIST_ID) OVER (ORDER BY h.ID) AS PREV_ARTIST_ID,
                                        LAG(tr.ALBUM_ID) OVER (ORDER BY h.ID) AS PREV_ALBUM_ID,
@@ -339,7 +338,7 @@ namespace MusicBeePlugin
                                ),
                                CLEANED_DELTAS AS (
                                    SELECT
-                                       SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, PITCH, SAMPLE_RATE_MULT, LENGTH,
+                                       SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, SAMPLE_RATE_MULT, LENGTH,
                                        CASE
                                            WHEN PREV_SESSION_ID IS NOT SESSION_ID THEN 0
                                            WHEN TITLE_ID IS NULL THEN 0
@@ -356,10 +355,7 @@ namespace MusicBeePlugin
                                        MAX(TIME) AS MAX_TIME,
                                        MAX(LENGTH) AS TRACK_LENGTH,
                                        SUM(DELTA_POS_MS) AS SUM_DELTA,
-                                       SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) AS SUM_REALTIME,
-                                       SUM(DELTA_POS_MS * SPEED_MULT) AS SUM_SPEED_MULT,
-                                       SUM(DELTA_POS_MS * PITCH) AS SUM_PITCH,
-                                       SUM(DELTA_POS_MS * SAMPLE_RATE_MULT) AS SUM_SAMPLE_MULT
+                                       SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) AS SUM_REALTIME
                                    FROM CLEANED_DELTAS
                                    GROUP BY SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID
                                    HAVING SUM(DELTA_POS_MS) > 0
@@ -370,26 +366,17 @@ namespace MusicBeePlugin
                                    al.VALUE AS ALBUM,
                                    ti.VALUE AS TRACK,
                                    agg.SUM_REALTIME / 1000.0 AS PLAYED_TIME,
-
                                    CASE
                                        WHEN agg.TRACK_LENGTH > 0
                                        THEN (agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0
                                        ELSE 0.0
                                    END AS PLAY_PERCENTAGE,
-
                                    CASE
-                                       WHEN ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) != 1.0
-                                            OR ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) != 0.0
-                                            OR ROUND(agg.SUM_SAMPLE_MULT / agg.SUM_DELTA, 2) != 1.0
-                                       THEN
-                                           SUBSTR(
-                                               CASE WHEN ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) != 1.00 THEN ', Speed: ' || ROUND(agg.SUM_SPEED_MULT / agg.SUM_DELTA, 2) || 'x' ELSE '' END ||
-                                               CASE WHEN ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) != 0.00 THEN ', Pitch: ' || ROUND(agg.SUM_PITCH / agg.SUM_DELTA, 2) ELSE '' END ||
-                                               CASE WHEN ROUND(agg.SUM_SAMPLE_MULT / agg.SUM_DELTA, 2) != 1.00 THEN ', Sample: ' || ROUND(agg.SUM_SAMPLE_MULT / agg.SUM_DELTA, 2) || 'x' ELSE '' END,
-                                               3
-                                           )
-                                       ELSE '-'
-                                   END AS EFFECTS
+                                       WHEN agg.TRACK_LENGTH > 0
+                                            AND (agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0 >= @SkipThreshold
+                                       THEN 'Listened'
+                                       ELSE 'Skipped'
+                                   END AS STATUS
                                FROM AGGREGATED agg
                                LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
                                LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
@@ -401,6 +388,7 @@ namespace MusicBeePlugin
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@MinTime", minTime);
+                    cmd.Parameters.AddWithValue("@SkipThreshold", skipThreshold);
                     using (var adapter = new SQLiteDataAdapter(cmd))
                     {
                         adapter.Fill(table);
