@@ -8,11 +8,13 @@ namespace MusicBeePlugin
     public partial class HistoryControl : UserControl
     {
         private readonly string _dbPath;
+        private readonly Plugin.MusicBeeApiInterface _mbApi;
 
-        public HistoryControl(string dbPath)
+        public HistoryControl(string dbPath, Plugin.MusicBeeApiInterface mbApi)
         {
             InitializeComponent();
             _dbPath = dbPath;
+            _mbApi = mbApi;
 
             Dock = DockStyle.Fill;
             AutoSize = false;
@@ -56,6 +58,59 @@ namespace MusicBeePlugin
             grid.AlternatingRowsDefaultCellStyle.BackColor = System.Drawing.Color.FromArgb(250, 250, 250);
             grid.GridColor = System.Drawing.Color.FromArgb(230, 230, 230);
             grid.CellFormatting += dataGridView_Formatting;
+            grid.CellDoubleClick += Grid_CellDoubleClick;
+        }
+
+        private void Grid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var grid = (DataGridView)sender;
+            var row = grid.Rows[e.RowIndex];
+
+            string artist = row.Cells["ARTIST"].Value?.ToString();
+            string album = row.Cells["ALBUM"].Value?.ToString();
+            string track = row.Cells["TRACK"].Value?.ToString();
+
+            if (string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(track))
+                return;
+
+            string url = FindTrackUrl(artist, album, track);
+            if (!string.IsNullOrEmpty(url))
+            {
+                _mbApi.NowPlayingList_PlayNow(url);
+            }
+        }
+
+        private string FindTrackUrl(string artist, string album, string track)
+        {
+            try
+            {
+                using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
+                using (var cmd = new SQLiteCommand(@"
+                    SELECT URLS.VALUE
+                    FROM TRACKS tr
+                    LEFT JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
+                    LEFT JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
+                    LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
+                    LEFT JOIN URLS ON URLS.ID = tr.URL_ID
+                    WHERE a.VALUE = @artist
+                      AND ti.VALUE = @track
+                      AND (@album IS NULL OR al.VALUE = @album)
+                    LIMIT 1", conn))
+                {
+                    cmd.Parameters.AddWithValue("@artist", artist);
+                    cmd.Parameters.AddWithValue("@track", track);
+                    cmd.Parameters.AddWithValue("@album", string.IsNullOrEmpty(album) ? (object)DBNull.Value : album);
+                    conn.Open();
+                    return cmd.ExecuteScalar() as string;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error resolving track URL: " + ex.Message);
+                return null;
+            }
         }
 
         private void LoadArtistTimeGrid()

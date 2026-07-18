@@ -220,8 +220,7 @@ namespace MusicBeePlugin
                 panel.SuspendLayout();
                 panel.Controls.Clear();
 
-                var historyPanel = new HistoryControl(
-                    Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME))
+                var historyPanel = new HistoryControl(Path.Combine(mbApiInterface.Setting_GetPersistentStoragePath(), DBNAME), mbApiInterface)
                 {
                     AutoSize = false,
                     Dock = DockStyle.None,
