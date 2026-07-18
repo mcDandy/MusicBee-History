@@ -181,7 +181,8 @@ namespace MusicBeePlugin
                                             WHEN MAX(LENGTH) > 0
                                             THEN (SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0
                                             ELSE 0
-                                        END AS SessionPercentage
+                                        END AS SessionPercentage,
+                                        MAX(TIME) AS MaxSessionTime
                                     FROM CLEANED_DELTAS
                                     GROUP BY SESSION_ID, ARTIST_ID
                                     HAVING SUM(DELTA_POS_MS) > 0
@@ -191,6 +192,7 @@ namespace MusicBeePlugin
                                         ARTIST_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
+                                        MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
@@ -204,7 +206,8 @@ namespace MusicBeePlugin
                                     TotalSessions AS PLAYED,
                                     SongsListened AS SONGS_LISTENED,
                                     SongsSkipped AS SONGS_SKIPPED,
-                                    CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT
+                                    CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT,
+                                    datetime(LastPlayTime, 'unixepoch', 'localtime') AS LAST_PLAY
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
                                 ORDER BY TotalRealtimeSec DESC;
@@ -297,7 +300,8 @@ namespace MusicBeePlugin
                                             WHEN MAX(LENGTH) > 0
                                             THEN (SUM(DELTA_POS_MS) / CAST(MAX(LENGTH) AS REAL)) * 100.0
                                             ELSE 0
-                                        END AS SessionPercentage
+                                        END AS SessionPercentage,
+                                        MAX(TIME) AS MaxSessionTime
                                     FROM CLEANED_DELTAS
                                     GROUP BY SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID
                                     HAVING SUM(DELTA_POS_MS) > 0
@@ -307,6 +311,7 @@ namespace MusicBeePlugin
                                         TITLE_ID, ARTIST_ID, ALBUM_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
+                                        MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
@@ -322,7 +327,8 @@ namespace MusicBeePlugin
                                     TotalSessions AS PLAYED,
                                     SongsListened AS SONGS_LISTENED,
                                     SongsSkipped AS SONGS_SKIPPED,
-                                    CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT
+                                    CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT,
+                                    datetime(LastPlayTime, 'unixepoch', 'localtime') AS LAST_PLAY
                                 FROM FINAL_SUMS f
                                     LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
                                     LEFT JOIN ALBUMS al ON al.ID = f.ALBUM_ID
