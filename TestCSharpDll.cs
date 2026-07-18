@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
@@ -13,7 +14,9 @@ namespace MusicBeePlugin
         private MusicBeeApiInterface mbApiInterface;
         private PluginInfo about = new PluginInfo();
         System.Windows.Forms.ComboBox textBox;
+        System.Windows.Forms.NumericUpDown skipThresholdBox;
         int? savedSeconds=null;
+        int? savedSkipThreshold=null;
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
         {
@@ -100,6 +103,38 @@ namespace MusicBeePlugin
 
                 configPanel.Controls.Add(textBox);
                 textBox.SelectedValue = savedSeconds ?? options[5].Value;
+
+                Label prompt2 = new Label();
+                prompt2.AutoSize = true;
+                prompt2.Location = new Point(textBox.Bounds.Right + 20, 0);
+                prompt2.Text = "skip threshold:";
+                configPanel.Controls.Add(prompt2);
+
+                skipThresholdBox = new System.Windows.Forms.NumericUpDown();
+                skipThresholdBox.Minimum = 0;
+                skipThresholdBox.Maximum = 100;
+                skipThresholdBox.Increment = 5;
+                skipThresholdBox.DecimalPlaces = 0;
+                skipThresholdBox.Bounds = new Rectangle(prompt2.Location.X + prompt2.Width + 10, 0, 50, skipThresholdBox.Height);
+
+                if (savedSkipThreshold is null)
+                {
+                    using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+                    {
+                        conn.Open();
+                        using (SQLiteCommand c = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='skip_threshold'", conn))
+                        {
+                            object result = c.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                savedSkipThreshold = Convert.ToInt32(result);
+                            }
+                        }
+                    }
+                }
+
+                configPanel.Controls.Add(skipThresholdBox);
+                skipThresholdBox.Value = savedSkipThreshold ?? 30;
             }
             return true;
         }
@@ -123,6 +158,18 @@ namespace MusicBeePlugin
                         c.Parameters.AddWithValue("@value", savedSeconds);
                         c.ExecuteNonQuery();
                     }
+                }
+            }
+
+            savedSkipThreshold = (int)skipThresholdBox.Value;
+
+            using (SQLiteConnection conn = new SQLiteConnection($"Data Source={dbFullPath};Version=3;"))
+            {
+                conn.Open();
+                using (SQLiteCommand c = new SQLiteCommand("INSERT OR REPLACE INTO SETTINGS (ID, VALUE) VALUES ('skip_threshold', @value)", conn))
+                {
+                    c.Parameters.AddWithValue("@value", savedSkipThreshold);
+                    c.ExecuteNonQuery();
                 }
             }
         }

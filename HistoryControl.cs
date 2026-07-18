@@ -27,24 +27,29 @@ namespace MusicBeePlugin
             LoadTopSongsGrid();
         }
 
-        private void LoadArtistTimeGrid()
+        private int GetSettingInt(string id, int defaultValue)
         {
-            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID=@id", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
             {
+                cmd.Parameters.AddWithValue("@id", id);
                 cmd.Connection.Open();
                 var result = cmd.ExecuteScalar();
-                if (result != null && int.TryParse(result.ToString(), out int seconds))
+                if (result != null && int.TryParse(result.ToString(), out int value))
                 {
-                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds;
-                }
-                else
-                {
-                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
+                    return value;
                 }
             }
-                try
-                {
+            return defaultValue;
+        }
+
+        private void LoadArtistTimeGrid()
+        {
+            int showSeconds = GetSettingInt("history_time", 30 * 24 * 60 * 60);
+            int skipThreshold = GetSettingInt("skip_threshold", 30);
+            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - showSeconds;
+
+            try
+            {
                     var sql = @"WITH BASE_HISTORY AS (
                                     SELECT
                                         h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
@@ -111,14 +116,21 @@ namespace MusicBeePlugin
                                     SELECT
                                         ARTIST_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
-                                        AVG(SessionPercentage) AS AvgPlayPercentage
+                                        AVG(SessionPercentage) AS AvgPlayPercentage,
+                                        COUNT(*) AS TotalSessions,
+                                        SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
+                                        SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
                                     FROM AGGREGATED_PER_SESSION
                                     GROUP BY ARTIST_ID
                                 )
                                 SELECT
                                     a.VALUE AS ARTIST,
                                     TotalRealtimeSec AS PLAYED_TIME,
-                                    AvgPlayPercentage AS PLAY_PERCENTAGE
+                                    AvgPlayPercentage AS PLAY_PERCENTAGE,
+                                    TotalSessions AS PLAYED,
+                                    SongsListened AS SONGS_LISTENED,
+                                    SongsSkipped AS SONGS_SKIPPED,
+                                    CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
                                 ORDER BY TotalRealtimeSec DESC;
@@ -129,6 +141,7 @@ namespace MusicBeePlugin
                     using (var cmd = new SQLiteCommand(sql, conn))
                     {
                         cmd.Parameters.AddWithValue("@MinTime", minTime);
+                        cmd.Parameters.AddWithValue("@SkipThreshold", skipThreshold);
                         using (var adapter = new SQLiteDataAdapter(cmd))
                         {
                             adapter.Fill(table);
@@ -146,21 +159,11 @@ namespace MusicBeePlugin
         }
         private void LoadTopSongsGrid()
         {
-            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
-            {
-                cmd.Connection.Open();
-                var result = cmd.ExecuteScalar();
-                if (result != null && int.TryParse(result.ToString(), out int seconds))
-                {
-                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds;
-                }
-                else
-                {
-                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
-                }
-            }
-                try
+            int showSeconds = GetSettingInt("history_time", 30 * 24 * 60 * 60);
+            int skipThreshold = GetSettingInt("skip_threshold", 30);
+            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - showSeconds;
+
+            try
             {
                     var sql = @"WITH BASE_HISTORY AS (
                                     SELECT
@@ -228,7 +231,10 @@ namespace MusicBeePlugin
                                     SELECT
                                         TITLE_ID, ARTIST_ID, ALBUM_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
-                                        AVG(SessionPercentage) AS AvgPlayPercentage
+                                        AVG(SessionPercentage) AS AvgPlayPercentage,
+                                        COUNT(*) AS TotalSessions,
+                                        SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
+                                        SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
                                     FROM AGGREGATED_PER_SESSION
                                     GROUP BY TITLE_ID, ARTIST_ID, ALBUM_ID
                                 )
@@ -237,11 +243,15 @@ namespace MusicBeePlugin
                                     al.VALUE AS ALBUM,
                                     ti.VALUE AS TRACK,
                                     TotalRealtimeSec AS PLAYED_TIME,
-                                    AvgPlayPercentage AS PLAY_PERCENTAGE
+                                    AvgPlayPercentage AS PLAY_PERCENTAGE,
+                                    TotalSessions AS PLAYED,
+                                    SongsListened AS SONGS_LISTENED,
+                                    SongsSkipped AS SONGS_SKIPPED,
+                                    CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT
                                 FROM FINAL_SUMS f
-                                LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
-                                LEFT JOIN ALBUMS al ON al.ID = f.ALBUM_ID
-                                LEFT JOIN TITLES ti ON ti.ID = f.TITLE_ID
+                                    LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
+                                    LEFT JOIN ALBUMS al ON al.ID = f.ALBUM_ID
+                                    LEFT JOIN TITLES ti ON ti.ID = f.TITLE_ID
                                 ORDER BY TotalRealtimeSec DESC;
                                 ";
 
@@ -250,6 +260,7 @@ namespace MusicBeePlugin
                 using (var cmd = new SQLiteCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@MinTime", minTime);
+                    cmd.Parameters.AddWithValue("@SkipThreshold", skipThreshold);
                     using (var adapter = new SQLiteDataAdapter(cmd))
                     {
                         adapter.Fill(table);
@@ -266,21 +277,9 @@ namespace MusicBeePlugin
         }
         private void LoadHistoryGrid()
         {
-            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
+            int showSeconds = GetSettingInt("history_time", 30 * 24 * 60 * 60);
+            long minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - showSeconds;
 
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT VALUE FROM SETTINGS WHERE ID='history_time'", new SQLiteConnection($"Data Source={_dbPath};Version=3;")))
-            {
-                cmd.Connection.Open();
-                var result = cmd.ExecuteScalar();
-                if (result != null && int.TryParse(result.ToString(), out int seconds))
-                {
-                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds;
-                }
-                else
-                {
-                    minTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 30 * 24 * 60 * 60; // Default to 30 days
-                }
-            }
             try
             {
                 string sql = @"WITH BASE_HISTORY AS (
@@ -449,7 +448,7 @@ namespace MusicBeePlugin
 
             string columnName = ((DataGridView)sender).Columns[e.ColumnIndex].Name;
 
-            if (columnName == "PLAY_PERCENTAGE")
+            if (columnName == "PLAY_PERCENTAGE" || columnName == "SKIP_PERCENT")
             {
                 if (double.TryParse(e.Value.ToString(), out double percent))
                 {
