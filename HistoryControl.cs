@@ -59,6 +59,7 @@ namespace MusicBeePlugin
             grid.GridColor = System.Drawing.Color.FromArgb(230, 230, 230);
             grid.CellFormatting += dataGridView_Formatting;
             grid.CellDoubleClick += Grid_CellDoubleClick;
+            grid.Columns["URL"].Visible = false;
         }
 
         private void Grid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -68,51 +69,10 @@ namespace MusicBeePlugin
             var grid = (DataGridView)sender;
             var row = grid.Rows[e.RowIndex];
 
-            if (!grid.Columns.Contains("TRACK"))
-                return;
-
-            string artist = row.Cells["ARTIST"].Value?.ToString();
-            string album = grid.Columns.Contains("ALBUM") ? row.Cells["ALBUM"].Value?.ToString() : null;
-            string track = row.Cells["TRACK"].Value?.ToString();
-
-            if (string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(track))
-                return;
-
-            string url = FindTrackUrl(artist, album, track);
+            string url = row.Cells["URL"]?.Value?.ToString();
             if (!string.IsNullOrEmpty(url))
             {
                 _mbApi.NowPlayingList_PlayNow(url);
-            }
-        }
-
-        private string FindTrackUrl(string artist, string album, string track)
-        {
-            try
-            {
-                using (var conn = new SQLiteConnection($"Data Source={_dbPath};Version=3;"))
-                using (var cmd = new SQLiteCommand(@"
-                    SELECT URLS.VALUE
-                    FROM TRACKS tr
-                    LEFT JOIN ARTISTS a ON a.ID = tr.ARTIST_ID
-                    LEFT JOIN ALBUMS al ON al.ID = tr.ALBUM_ID
-                    LEFT JOIN TITLES ti ON ti.ID = tr.TITLE_ID
-                    LEFT JOIN URLS ON URLS.ID = tr.URL_ID
-                    WHERE a.VALUE = @artist
-                      AND ti.VALUE = @track
-                      AND (@album IS NULL OR al.VALUE = @album)
-                    LIMIT 1", conn))
-                {
-                    cmd.Parameters.AddWithValue("@artist", artist);
-                    cmd.Parameters.AddWithValue("@track", track);
-                    cmd.Parameters.AddWithValue("@album", string.IsNullOrEmpty(album) ? (object)DBNull.Value : album);
-                    conn.Open();
-                    return cmd.ExecuteScalar() as string;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error resolving track URL: " + ex.Message);
-                return null;
             }
         }
 
@@ -128,9 +88,8 @@ namespace MusicBeePlugin
                                     SELECT
                                         h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                         ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
-                                        h.PITCH,
                                         ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
-                                        tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH,
+                                        tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH, tr.URL_ID,
                                         LAG(tr.TITLE_ID) OVER (ORDER BY h.ID) AS PREV_TITLE_ID,
                                         LAG(tr.ARTIST_ID) OVER (ORDER BY h.ID) AS PREV_ARTIST_ID,
                                         LAG(tr.ALBUM_ID) OVER (ORDER BY h.ID) AS PREV_ALBUM_ID,
@@ -162,7 +121,7 @@ namespace MusicBeePlugin
                                 ),
                                 CLEANED_DELTAS AS (
                                     SELECT
-                                        SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, PITCH, SAMPLE_RATE_MULT, LENGTH,
+                                        SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, SAMPLE_RATE_MULT, LENGTH, URL_ID,
                                         CASE
                                             WHEN PREV_SESSION_ID IS NOT SESSION_ID THEN 0
                                             WHEN TITLE_ID IS NULL THEN 0
@@ -175,7 +134,7 @@ namespace MusicBeePlugin
                                 ),
                                 AGGREGATED_PER_SESSION AS (
                                     SELECT
-                                        ARTIST_ID,
+                                        ARTIST_ID, URL_ID,
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
                                         CASE
                                             WHEN MAX(LENGTH) > 0
@@ -194,6 +153,7 @@ namespace MusicBeePlugin
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
                                         MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
+                                        min(URL_ID) AS URL_ID,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
                                     FROM AGGREGATED_PER_SESSION
@@ -207,9 +167,11 @@ namespace MusicBeePlugin
                                     SongsListened AS SONGS_LISTENED,
                                     SongsSkipped AS SONGS_SKIPPED,
                                     CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT,
-                                    datetime(LastPlayTime, 'unixepoch', 'localtime') AS LAST_PLAY
+                                    datetime(LastPlayTime, 'unixepoch', 'localtime') AS LAST_PLAY,
+                                    u.VALUE AS URL
                                 FROM FINAL_SUMS f
                                 LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
+                                LEFT JOIN URLS u ON u.ID = f.URL_ID
                                 ORDER BY TotalRealtimeSec DESC;
                                 ";
 
@@ -247,9 +209,8 @@ namespace MusicBeePlugin
                                     SELECT
                                         h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                         ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
-                                        h.PITCH,
                                         ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
-                                        tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH,
+                                        tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.GENRE_ID, tr.LENGTH, tr.URL_ID,
                                         LAG(tr.TITLE_ID) OVER (ORDER BY h.ID) AS PREV_TITLE_ID,
                                         LAG(tr.ARTIST_ID) OVER (ORDER BY h.ID) AS PREV_ARTIST_ID,
                                         LAG(tr.ALBUM_ID) OVER (ORDER BY h.ID) AS PREV_ALBUM_ID,
@@ -281,7 +242,7 @@ namespace MusicBeePlugin
                                 ),
                                 CLEANED_DELTAS AS (
                                     SELECT
-                                        SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, PITCH, SAMPLE_RATE_MULT, LENGTH,
+                                        SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, SAMPLE_RATE_MULT, LENGTH, URL_ID,
                                         CASE
                                             WHEN PREV_SESSION_ID IS NOT SESSION_ID THEN 0
                                             WHEN TITLE_ID IS NULL THEN 0
@@ -294,7 +255,7 @@ namespace MusicBeePlugin
                                 ),
                                 AGGREGATED_PER_SESSION AS (
                                     SELECT
-                                        TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                        TITLE_ID, ARTIST_ID, ALBUM_ID, URL_ID,
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
                                         CASE
                                             WHEN MAX(LENGTH) > 0
@@ -308,13 +269,14 @@ namespace MusicBeePlugin
                                 ),
                                 FINAL_SUMS AS (
                                     SELECT
-                                        TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                        TITLE_ID, ARTIST_ID, ALBUM_ID, URL_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
                                         MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
-                                        SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
+                                        SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped,
+                                        MIN(URL_ID) AS URL_ID
                                     FROM AGGREGATED_PER_SESSION
                                     GROUP BY TITLE_ID, ARTIST_ID, ALBUM_ID
                                 )
@@ -328,11 +290,13 @@ namespace MusicBeePlugin
                                     SongsListened AS SONGS_LISTENED,
                                     SongsSkipped AS SONGS_SKIPPED,
                                     CAST(SongsSkipped AS REAL) * 100.0 / NULLIF(TotalSessions, 0) AS SKIP_PERCENT,
-                                    datetime(LastPlayTime, 'unixepoch', 'localtime') AS LAST_PLAY
+                                    datetime(LastPlayTime, 'unixepoch', 'localtime') AS LAST_PLAY,
+                                    u.VALUE AS URL
                                 FROM FINAL_SUMS f
                                     LEFT JOIN ARTISTS a ON a.ID = f.ARTIST_ID
                                     LEFT JOIN ALBUMS al ON al.ID = f.ALBUM_ID
                                     LEFT JOIN TITLES ti ON ti.ID = f.TITLE_ID
+                                    LEFT JOIN URLS u ON u.ID = f.URL_ID
                                 ORDER BY TotalRealtimeSec DESC;
                                 ";
 
@@ -370,7 +334,7 @@ namespace MusicBeePlugin
                                        h.ID, h.TIME, h.PLAY_HEAD, h.EVENT_TYPE, h.PLAYER_STATE,
                                        ((100.0 + h.SPEED) / 100.0) AS SPEED_MULT,
                                        ((100.0 + h.SAMPLE_RATE) / 100.0) AS SAMPLE_RATE_MULT,
-                                       tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.LENGTH,
+                                       tr.TITLE_ID, tr.ARTIST_ID, tr.ALBUM_ID, tr.LENGTH, tr.URL_ID,
                                        LAG(tr.TITLE_ID) OVER (ORDER BY h.ID) AS PREV_TITLE_ID,
                                        LAG(tr.ARTIST_ID) OVER (ORDER BY h.ID) AS PREV_ARTIST_ID,
                                        LAG(tr.ALBUM_ID) OVER (ORDER BY h.ID) AS PREV_ALBUM_ID,
@@ -402,7 +366,7 @@ namespace MusicBeePlugin
                                ),
                                CLEANED_DELTAS AS (
                                    SELECT
-                                       SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, SAMPLE_RATE_MULT, LENGTH,
+                                       SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID, TIME, SPEED_MULT, SAMPLE_RATE_MULT, LENGTH, URL_ID,
                                        CASE
                                            WHEN PREV_SESSION_ID IS NOT SESSION_ID THEN 0
                                            WHEN TITLE_ID IS NULL THEN 0
@@ -415,7 +379,7 @@ namespace MusicBeePlugin
                                ),
                                AGGREGATED AS (
                                    SELECT
-                                       TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                       TITLE_ID, ARTIST_ID, ALBUM_ID, MIN(URL_ID) AS URL_ID,
                                        MAX(TIME) AS MAX_TIME,
                                        MAX(LENGTH) AS TRACK_LENGTH,
                                        SUM(DELTA_POS_MS) AS SUM_DELTA,
@@ -430,6 +394,7 @@ namespace MusicBeePlugin
                                    al.VALUE AS ALBUM,
                                    ti.VALUE AS TRACK,
                                    agg.SUM_REALTIME / 1000.0 AS PLAYED_TIME,
+                                   u.VALUE AS URL,
                                    CASE
                                        WHEN agg.TRACK_LENGTH > 0
                                        THEN (agg.SUM_DELTA / CAST(agg.TRACK_LENGTH AS REAL)) * 100.0
@@ -445,6 +410,7 @@ namespace MusicBeePlugin
                                LEFT JOIN ARTISTS a ON a.ID = agg.ARTIST_ID
                                LEFT JOIN ALBUMS al ON al.ID = agg.ALBUM_ID
                                LEFT JOIN TITLES ti ON ti.ID = agg.TITLE_ID
+                               LEFT JOIN URLS u ON u.ID = agg.URL_ID
                                ORDER BY agg.MAX_TIME DESC;";
 
                 var table = new DataTable();
