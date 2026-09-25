@@ -153,7 +153,7 @@ namespace MusicBeePlugin
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
                                         MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
-                                        min(URL_ID) AS URL_ID,
+                                        MAX(URL_ID) AS URL_ID,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
                                     FROM AGGREGATED_PER_SESSION
@@ -276,7 +276,7 @@ namespace MusicBeePlugin
                                         COUNT(*) AS TotalSessions,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped,
-                                        MIN(URL_ID) AS URL_ID
+                                        MAX(URL_ID) AS URL_ID
                                     FROM AGGREGATED_PER_SESSION
                                     GROUP BY TITLE_ID, ARTIST_ID, ALBUM_ID
                                 )
@@ -379,7 +379,7 @@ namespace MusicBeePlugin
                                ),
                                AGGREGATED AS (
                                    SELECT
-                                       TITLE_ID, ARTIST_ID, ALBUM_ID, MIN(URL_ID) AS URL_ID,
+                                       TITLE_ID, ARTIST_ID, ALBUM_ID, MAX(URL_ID) AS URL_ID,
                                        MAX(TIME) AS MAX_TIME,
                                        MAX(LENGTH) AS TRACK_LENGTH,
                                        SUM(DELTA_POS_MS) AS SUM_DELTA,
