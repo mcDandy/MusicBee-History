@@ -98,7 +98,8 @@ namespace MusicBeePlugin
                                         LAG(h.TIME) OVER (ORDER BY h.ID) AS PREV_TIME
                                     FROM HISTORY h
                                     LEFT JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                                    WHERE (h.EVENT_TYPE IN (0, 1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
+                                    WHERE h.EVENT_TYPE <> 16
+                                      AND (h.EVENT_TYPE IN (0, 1, 2, 17, 48) OR h.PLAYER_STATE = 3)
                                       AND h.TIME > @MinTime
                                 ),
                                 SESSIONS AS (
@@ -134,7 +135,14 @@ namespace MusicBeePlugin
                                 ),
                                 AGGREGATED_PER_SESSION AS (
                                     SELECT
-                                        ARTIST_ID, URL_ID,
+                                        SESSION_ID, ARTIST_ID,
+                                        (SELECT cd.URL_ID
+                                         FROM CLEANED_DELTAS cd
+                                         WHERE cd.SESSION_ID = CLEANED_DELTAS.SESSION_ID
+                                           AND cd.ARTIST_ID IS CLEANED_DELTAS.ARTIST_ID
+                                           AND cd.URL_ID IS NOT NULL
+                                         ORDER BY cd.TIME DESC
+                                         LIMIT 1) AS URL_ID,
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
                                         CASE
                                             WHEN MAX(LENGTH) > 0
@@ -153,7 +161,12 @@ namespace MusicBeePlugin
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
                                         MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
-                                        MAX(URL_ID) AS URL_ID,
+                                        (SELECT ap.URL_ID
+                                         FROM AGGREGATED_PER_SESSION ap
+                                         WHERE ap.ARTIST_ID IS AGGREGATED_PER_SESSION.ARTIST_ID
+                                           AND ap.URL_ID IS NOT NULL
+                                         ORDER BY ap.MaxSessionTime DESC
+                                         LIMIT 1) AS URL_ID,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped
                                     FROM AGGREGATED_PER_SESSION
@@ -219,7 +232,8 @@ namespace MusicBeePlugin
                                         LAG(h.TIME) OVER (ORDER BY h.ID) AS PREV_TIME
                                     FROM HISTORY h
                                     LEFT JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                                    WHERE (h.EVENT_TYPE IN (0, 1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
+                                    WHERE h.EVENT_TYPE <> 16
+                                      AND (h.EVENT_TYPE IN (0, 1, 2, 17, 48) OR h.PLAYER_STATE = 3)
                                       AND h.TIME > @MinTime
                                 ),
                                 SESSIONS AS (
@@ -255,7 +269,16 @@ namespace MusicBeePlugin
                                 ),
                                 AGGREGATED_PER_SESSION AS (
                                     SELECT
-                                        TITLE_ID, ARTIST_ID, ALBUM_ID, URL_ID,
+                                        SESSION_ID, TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                        (SELECT cd.URL_ID
+                                         FROM CLEANED_DELTAS cd
+                                         WHERE cd.SESSION_ID = CLEANED_DELTAS.SESSION_ID
+                                           AND cd.TITLE_ID IS CLEANED_DELTAS.TITLE_ID
+                                           AND cd.ARTIST_ID IS CLEANED_DELTAS.ARTIST_ID
+                                           AND cd.ALBUM_ID IS CLEANED_DELTAS.ALBUM_ID
+                                           AND cd.URL_ID IS NOT NULL
+                                         ORDER BY cd.TIME DESC
+                                         LIMIT 1) AS URL_ID,
                                         SUM(DELTA_POS_MS / (SPEED_MULT * SAMPLE_RATE_MULT)) / 1000.0 AS SessionRealtimeSec,
                                         CASE
                                             WHEN MAX(LENGTH) > 0
@@ -269,14 +292,21 @@ namespace MusicBeePlugin
                                 ),
                                 FINAL_SUMS AS (
                                     SELECT
-                                        TITLE_ID, ARTIST_ID, ALBUM_ID, URL_ID,
+                                        TITLE_ID, ARTIST_ID, ALBUM_ID,
                                         SUM(SessionRealtimeSec) AS TotalRealtimeSec,
                                         AVG(SessionPercentage) AS AvgPlayPercentage,
                                         MAX(MaxSessionTime) AS LastPlayTime,
                                         COUNT(*) AS TotalSessions,
                                         SUM(CASE WHEN SessionPercentage >= @SkipThreshold THEN 1 ELSE 0 END) AS SongsListened,
                                         SUM(CASE WHEN SessionPercentage < @SkipThreshold THEN 1 ELSE 0 END) AS SongsSkipped,
-                                        MAX(URL_ID) AS URL_ID
+                                        (SELECT ap.URL_ID
+                                         FROM AGGREGATED_PER_SESSION ap
+                                         WHERE ap.TITLE_ID IS AGGREGATED_PER_SESSION.TITLE_ID
+                                           AND ap.ARTIST_ID IS AGGREGATED_PER_SESSION.ARTIST_ID
+                                           AND ap.ALBUM_ID IS AGGREGATED_PER_SESSION.ALBUM_ID
+                                           AND ap.URL_ID IS NOT NULL
+                                         ORDER BY ap.MaxSessionTime DESC
+                                         LIMIT 1) AS URL_ID
                                     FROM AGGREGATED_PER_SESSION
                                     GROUP BY TITLE_ID, ARTIST_ID, ALBUM_ID
                                 )
@@ -343,7 +373,8 @@ namespace MusicBeePlugin
                                        LAG(h.TIME) OVER (ORDER BY h.ID) AS PREV_TIME
                                    FROM HISTORY h
                                    LEFT JOIN TRACKS tr ON tr.ID = h.TRACK_ID
-                                   WHERE (h.EVENT_TYPE IN (0, 1, 2, 16, 17, 48) OR h.PLAYER_STATE = 3)
+                                   WHERE h.EVENT_TYPE <> 16
+                                     AND (h.EVENT_TYPE IN (0, 1, 2, 17, 48) OR h.PLAYER_STATE = 3)
                                      AND h.TIME > @MinTime
                                ),
                                SESSIONS AS (
@@ -379,7 +410,16 @@ namespace MusicBeePlugin
                                ),
                                AGGREGATED AS (
                                    SELECT
-                                       TITLE_ID, ARTIST_ID, ALBUM_ID, MAX(URL_ID) AS URL_ID,
+                                       TITLE_ID, ARTIST_ID, ALBUM_ID,
+                                       (SELECT cd.URL_ID
+                                        FROM CLEANED_DELTAS cd
+                                        WHERE cd.SESSION_ID = CLEANED_DELTAS.SESSION_ID
+                                          AND cd.TITLE_ID IS CLEANED_DELTAS.TITLE_ID
+                                          AND cd.ARTIST_ID IS CLEANED_DELTAS.ARTIST_ID
+                                          AND cd.ALBUM_ID IS CLEANED_DELTAS.ALBUM_ID
+                                          AND cd.URL_ID IS NOT NULL
+                                        ORDER BY cd.TIME DESC
+                                        LIMIT 1) AS URL_ID,
                                        MAX(TIME) AS MAX_TIME,
                                        MAX(LENGTH) AS TRACK_LENGTH,
                                        SUM(DELTA_POS_MS) AS SUM_DELTA,
